@@ -37,9 +37,9 @@ class VulnerableAppTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Vulnerable Flask App', response.data)
     
-    # Test 2: AJAX detection (tests deprecated is_xhr)
+    # Test 2: AJAX detection
     def test_ajax_detection(self):
-        """Test AJAX request detection using deprecated is_xhr"""
+        """Test AJAX request detection"""
         response = self.client.get('/', headers={'X-Requested-With': 'XMLHttpRequest'})
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'AJAX request', response.data)
