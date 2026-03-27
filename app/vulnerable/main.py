@@ -4,7 +4,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def index():
-    if request.is_xhr:
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return 'This was an AJAX request'
     return 'Status is OK!'
 
