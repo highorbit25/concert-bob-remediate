@@ -470,7 +470,35 @@ What type of vulnerability is it?
 }
 ```
 
-**B. Apply the Fix Based on Vulnerability Type**
+**B. Identify and Handle Breaking Changes**
+
+**🚨 CRITICAL: Before applying any fix, identify potential breaking changes:**
+
+1. **For Dependency Updates:**
+   - Check semantic versioning (major.minor.patch)
+   - Major version changes (e.g., 1.x → 2.x) = Breaking changes likely
+   - Review official migration guides and changelogs
+   - Look for:
+     - Deprecated API removals
+     - Changed function signatures
+     - Renamed modules/packages
+     - Modified configuration formats
+     - Changed default behaviors
+
+2. **For Code Fixes:**
+   - Identify all code locations using the vulnerable pattern
+   - Check if the fix changes function signatures or return types
+   - Verify if the fix affects public APIs
+   - Consider impact on existing tests
+
+3. **Common Breaking Changes by Package:**
+   - **Flask 1.x → 2.x**: `request.is_xhr` removed (use `request.headers.get('X-Requested-With') == 'XMLHttpRequest'`)
+   - **SQLAlchemy 1.x → 2.x**: Query API changes, engine creation changes
+   - **Django 3.x → 4.x**: URL resolver changes, middleware updates
+   - **React 17 → 18**: Automatic batching, new root API
+   - **Node.js major versions**: Module system changes, API deprecations
+
+**C. Apply the Fix Based on Vulnerability Type**
 
 **For Dependency Updates:**
 ```json
@@ -526,7 +554,194 @@ What type of vulnerability is it?
    - Update resource limits
 4. **Document the changes**
 
-### Step 6: Create Comprehensive Pull Request
+### Step 6: Run Unit Tests and Verify Functionality
+
+**🧪 CRITICAL: Test the fix before creating a PR**
+
+**A. Locate and Run Existing Tests**
+
+1. **Find test files:**
+   ```bash
+   # Common test file patterns
+   find . -name "*test*.py" -o -name "test_*.py"  # Python
+   find . -name "*.test.js" -o -name "*.spec.js"  # JavaScript
+   find . -name "*_test.go"                        # Go
+   find . -name "*Test.java"                       # Java
+   ```
+
+2. **Run the test suite:**
+   ```bash
+   # Python
+   python -m pytest                    # pytest
+   python -m unittest discover         # unittest
+   python -m pytest -v test_main.py   # specific file
+   
+   # JavaScript/Node.js
+   npm test                           # package.json scripts
+   npm run test:unit                  # unit tests
+   jest                               # Jest framework
+   
+   # Go
+   go test ./...                      # all packages
+   go test -v ./pkg/...              # specific package
+   
+   # Java
+   mvn test                           # Maven
+   ./gradlew test                     # Gradle
+   ```
+
+3. **Analyze test results:**
+   - ✅ All tests pass → Proceed to PR creation
+   - ❌ Tests fail → Debug and fix issues before PR
+
+**B. Debug Failed Tests**
+
+**If tests fail after applying the fix:**
+
+1. **Identify the failure:**
+   - Read the test failure message carefully
+   - Identify which test(s) failed
+   - Understand what the test expects vs. what it got
+
+2. **Common failure patterns and fixes:**
+
+   **Pattern 1: Breaking API Changes**
+   ```python
+   # Test fails because API changed
+   # Old code (Flask 1.x):
+   if request.is_xhr:
+       return 'AJAX'
+   
+   # Fix for Flask 2.x:
+   if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+       return 'AJAX'
+   ```
+
+   **Pattern 2: Changed Function Signatures**
+   ```python
+   # Test fails because function signature changed
+   # Old: db.query(sql)
+   # New: db.query(sql, params)
+   
+   # Update all calls to match new signature
+   ```
+
+   **Pattern 3: Import Changes**
+   ```python
+   # Test fails because import path changed
+   # Old: from package import OldClass
+   # New: from package.new_module import NewClass
+   ```
+
+   **Pattern 4: Configuration Changes**
+   ```python
+   # Test fails because config format changed
+   # Update test fixtures and config files
+   ```
+
+3. **Fix the code to pass tests:**
+   - Update the application code to handle breaking changes
+   - Ensure backward compatibility where possible
+   - Update test fixtures if needed (but don't change test logic)
+
+4. **Re-run tests after fixes:**
+   ```bash
+   # Run tests again to verify fixes
+   python -m pytest -v
+   ```
+
+5. **Iterate until all tests pass:**
+   - Fix one issue at a time
+   - Re-run tests after each fix
+   - Document what was changed and why
+
+**C. Add New Security Tests (If Applicable)**
+
+**For code vulnerability fixes, add tests to verify the fix:**
+
+```python
+# Example: Test for SQL Injection fix
+def test_sql_injection_prevented(self):
+    """Test that SQL injection is prevented"""
+    malicious_input = "1' OR '1'='1"
+    response = self.client.get(f'/user/{malicious_input}')
+    # Should return 404 or error, not all users
+    self.assertNotEqual(response.status_code, 200)
+
+# Example: Test for XSS fix
+def test_xss_prevented(self):
+    """Test that XSS is prevented"""
+    malicious_script = "<script>alert('XSS')</script>"
+    response = self.client.get(f'/greet?name={malicious_script}')
+    # Script should be escaped, not executed
+    self.assertNotIn(b'<script>', response.data)
+    self.assertIn(b'<script>', response.data)
+```
+
+**D. Verify Application Functionality**
+
+1. **Manual testing (if applicable):**
+   - Start the application locally
+   - Test the affected endpoints/features
+   - Verify the vulnerability is fixed
+   - Ensure no functionality is broken
+
+2. **Integration testing:**
+   - Test interactions between components
+   - Verify database operations work correctly
+   - Check API responses are correct
+
+**E. Document Test Results**
+
+Create a test report in your documentation:
+
+```markdown
+## Test Results
+
+### Test Execution
+- **Date**: {timestamp}
+- **Branch**: fix/issue-{N}-{cve-id}
+- **Test Framework**: {pytest/jest/etc.}
+- **Total Tests**: {number}
+- **Passed**: {number}
+- **Failed**: {number}
+- **Skipped**: {number}
+
+### Failed Tests (Before Fix)
+1. `test_ajax_detection` - Failed due to `request.is_xhr` removal in Flask 2.x
+   - **Error**: AttributeError: 'Request' object has no attribute 'is_xhr'
+   - **Fix Applied**: Updated to use `request.headers.get('X-Requested-With') == 'XMLHttpRequest'`
+   - **Status**: ✅ FIXED
+
+2. `test_user_profile_valid` - Failed due to SQL query changes
+   - **Error**: TypeError: query() takes 2 positional arguments but 3 were given
+   - **Fix Applied**: Updated to use parameterized queries
+   - **Status**: ✅ FIXED
+
+### Final Test Results
+- ✅ All 20 tests passing
+- ✅ No regressions detected
+- ✅ Security vulnerability verified as fixed
+- ✅ Application functionality maintained
+
+### New Security Tests Added
+1. `test_sql_injection_prevented` - Verifies SQL injection is blocked
+2. `test_xss_prevented` - Verifies XSS is prevented
+```
+
+**F. Success Criteria for Testing Phase**
+
+✅ All existing tests pass
+✅ No new test failures introduced
+✅ Breaking changes identified and fixed
+✅ Security vulnerability verified as fixed
+✅ Application functionality maintained
+✅ New security tests added (if applicable)
+✅ Test results documented
+
+**🚨 DO NOT CREATE A PR UNTIL ALL TESTS PASS**
+
+### Step 7: Create Comprehensive Pull Request
 
 **Title Format:**
 ```
@@ -621,12 +836,31 @@ What type of vulnerability is it?
 
 ### ✅ Testing Performed
 
-- [ ] Verified fix addresses the vulnerability
-- [ ] Checked for breaking changes
-- [ ] Tested with existing test suite
-- [ ] Added new security tests (if applicable)
-- [ ] Verified no new vulnerabilities introduced
-- [ ] Tested in development environment
+**Unit Test Results:**
+- **Total Tests**: {number}
+- **Passed**: {number}
+- **Failed**: 0 (all fixed)
+- **Test Framework**: {pytest/jest/etc.}
+- **Test Command**: `{command used}`
+
+**Breaking Changes Fixed:**
+1. {Description of breaking change and how it was fixed}
+2. {Description of breaking change and how it was fixed}
+
+**Test Execution Log:**
+```
+{Paste relevant test output showing all tests passing}
+```
+
+**Checklist:**
+- [x] Verified fix addresses the vulnerability
+- [x] Identified and documented breaking changes
+- [x] Fixed breaking changes in application code
+- [x] All existing tests passing
+- [x] Added new security tests (if applicable)
+- [x] Verified no new vulnerabilities introduced
+- [x] Verified no regressions introduced
+- [x] Tested in development environment
 
 ### 📚 References
 
@@ -654,7 +888,7 @@ What type of vulnerability is it?
 Closes #{issue_number}
 ```
 
-### Step 7: Document the Research and Remediation
+### Step 8: Document the Research and Remediation
 
 Create `bob_task_<CVE>_<datetime>.md` with:
 
@@ -695,14 +929,26 @@ Create `bob_task_<CVE>_<datetime>.md` with:
 - **Files modified**: {list with line numbers}
 - **Changes made**: {detailed summary}
 - **Security patterns applied**: {list}
+- **Breaking changes identified**: {list with details}
+- **Breaking changes fixed**: {how each was addressed}
 - **Testing performed**: {tests run}
+- **Test results**: {before and after}
 - **Verification**: {how verified the fix works}
 
 ### Compatibility Analysis
 - **Dependencies checked**: {list}
 - **Breaking changes**: {YES/NO with details}
+- **Breaking changes handled**: {how code was updated}
 - **Migration required**: {YES/NO with steps}
+- **Test failures resolved**: {list of failures and fixes}
 - **Rollback plan**: {if needed}
+
+### Test Results
+- **Initial test run**: {number passed/failed}
+- **Failed tests**: {list with reasons}
+- **Fixes applied**: {how each failure was resolved}
+- **Final test run**: {all tests passing}
+- **New tests added**: {security tests added}
 ```
 
 ## 🎯 Success Criteria
@@ -719,16 +965,30 @@ Create `bob_task_<CVE>_<datetime>.md` with:
 ### Implementation Phase
 ✅ Repository context analyzed comprehensively
 ✅ Current state assessed accurately
+✅ Breaking changes identified and documented
 ✅ Appropriate fix implemented for vulnerability type
 ✅ Code quality maintained or improved
 ✅ Security best practices followed
-✅ No breaking changes introduced (or documented if unavoidable)
+✅ Breaking changes handled correctly in code
 ✅ Similar vulnerable patterns also fixed
+
+### Testing Phase (CRITICAL - MANDATORY)
+✅ All existing unit tests located and executed
+✅ Test failures analyzed and root causes identified
+✅ Breaking changes fixed in application code
+✅ All tests passing after fixes applied
+✅ No regressions introduced
+✅ New security tests added (if applicable)
+✅ Test results documented with before/after comparison
+✅ Manual testing performed (if applicable)
+✅ Integration testing completed
 
 ### Documentation Phase
 ✅ Comprehensive PR description created
 ✅ Research process documented with sources
-✅ Testing steps provided
+✅ Breaking changes documented with migration notes
+✅ Test results included in PR description
+✅ Testing steps provided for reviewers
 ✅ Deployment notes included
 ✅ References linked
 ✅ bob_task.md updated with full analysis
@@ -738,8 +998,10 @@ Create `bob_task_<CVE>_<datetime>.md` with:
 ✅ No new vulnerabilities introduced
 ✅ Compatible with existing code/dependencies
 ✅ Follows project conventions
-✅ Properly tested and verified
+✅ All tests passing (MANDATORY)
+✅ Breaking changes handled correctly
 ✅ Security tests added (if applicable)
+✅ Application functionality verified
 
 ## 🚨 Important Notes
 
@@ -768,6 +1030,14 @@ Create `bob_task_<CVE>_<datetime>.md` with:
 - **Test Thoroughly**: Verify the fix works and doesn't break functionality
 - **Think Like an Attacker**: Consider how the vulnerability could be exploited
 
+### Breaking Changes Management
+- **Identify Early**: Check for breaking changes during research phase
+- **Document Thoroughly**: List all breaking changes and their impacts
+- **Fix Proactively**: Update code to handle breaking changes before PR
+- **Test Extensively**: Run all tests and fix failures before PR
+- **Communicate Clearly**: Document breaking changes in PR description
+- **Provide Migration Path**: Include steps for handling breaking changes
+
 ### Critical Validation Checklist
 Before implementing ANY fix:
 - ✅ Researched CVE from official sources (NVD, vendor advisory)
@@ -776,8 +1046,21 @@ Before implementing ANY fix:
 - ✅ Cross-referenced information across multiple sources
 - ✅ Validated fix compatibility with current repository state
 - ✅ Checked for breaking changes and migration requirements
+- ✅ Identified all breaking changes in the fix
 - ✅ Considered similar vulnerable patterns elsewhere
 - ✅ Documented all research sources and decision rationale
+
+### Testing Validation Checklist
+Before creating a PR:
+- ✅ Located all test files in the repository
+- ✅ Executed the complete test suite
+- ✅ Analyzed all test failures
+- ✅ Fixed breaking changes in application code
+- ✅ Re-ran tests until all pass
+- ✅ Added new security tests (if applicable)
+- ✅ Documented test results with before/after comparison
+- ✅ Verified no regressions introduced
+- ✅ Confirmed application functionality maintained
 
 ### When to Ask for Help
 - **Ambiguous CVE**: If official sources provide conflicting information
@@ -787,6 +1070,8 @@ Before implementing ANY fix:
 - **Complex Vulnerability**: If root cause spans multiple components
 - **Compatibility Issues**: If official fix incompatible with current environment
 - **Unclear Impact**: If unsure about the scope of changes needed
+- **Test Failures**: If unable to resolve test failures after multiple attempts
+- **Missing Tests**: If no test suite exists in the repository
 
 ---
 

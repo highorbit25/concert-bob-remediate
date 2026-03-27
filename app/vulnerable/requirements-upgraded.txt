@@ -1,0 +1,35 @@
+# Upgraded requirements with non-vulnerable versions
+# This file demonstrates breaking changes when upgrading Flask from 1.x to 2.x
+# 
+# Key Breaking Change:
+# - Flask 2.0+ removes the deprecated `request.is_xhr` attribute
+# - This will cause test_ajax_detection to fail until code is updated
+#
+# To test the breaking change:
+# 1. Create a new virtual environment: python -m venv venv-upgraded
+# 2. Activate it: source venv-upgraded/bin/activate
+# 3. Install these packages: pip install -r requirements-upgraded.txt
+# 4. Run tests: python -m unittest test_main.py -v
+# 5. Observe test_ajax_detection failure with AttributeError
+#
+# Expected failure:
+# FAIL: test_ajax_detection (test_main.VulnerableAppTestCase)
+# AttributeError: 'Request' object has no attribute 'is_xhr'
+
+# Flask 2.3.x - Latest stable version (removes request.is_xhr)
+Flask==2.3.3
+
+# Compatible Werkzeug version for Flask 2.3.x
+Werkzeug==2.3.7
+
+# Compatible Jinja2 version
+Jinja2==3.1.2
+
+# Compatible MarkupSafe version
+MarkupSafe==2.1.3
+
+# Compatible itsdangerous version
+itsdangerous==2.1.2
+
+# Compatible click version
+click==8.1.7
