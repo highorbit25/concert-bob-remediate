@@ -15,13 +15,14 @@ jobs:
         env:
           CONCERT_API_KEY: ${{ secrets.CONCERT_API_KEY }}
           INSTANCE_ID: ${{ secrets.CONCERT_INSTANCE_ID || '0000-0000-0000-0000' }}
-          JOB_ID: "92073c05-78c1-4f1b-8408-89ed1341a592"
+          CONCERT_URL: ${{ vars.CONCERT_URL || 'https://162.133.134.251:12443' }}
+          JOB_ID: ${{ vars.INGESTION_JOB_ID || '92073c05-78c1-4f1b-8408-89ed1341a592' }}
         run: |
           echo "Triggering Concert ingestion job..."
           echo "Job ID: ${JOB_ID}"
           
           RESPONSE=$(curl -k --request POST \
-            --url https://162.133.134.251:12443/ingestion/api/v1/job/v2/submit \
+            --url ${CONCERT_URL}/ingestion/api/v1/job/v2/submit \
             --header "Authorization: ${CONCERT_API_KEY}" \
             --header "InstanceId: ${INSTANCE_ID}" \
             --header 'accept: application/json' \
@@ -51,7 +52,7 @@ jobs:
         run: |
           echo "## Concert Ingestion Job Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Job ID**: 92073c05-78c1-4f1b-8408-89ed1341a592" >> $GITHUB_STEP_SUMMARY
+          echo "- **Job ID**: ${{ env.JOB_ID }} >> $GITHUB_STEP_SUMMARY
           echo "- **Job Type**: source_control_discovery_job" >> $GITHUB_STEP_SUMMARY
           echo "- **Triggered By**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
