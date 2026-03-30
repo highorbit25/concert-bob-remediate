@@ -144,14 +144,14 @@ class VulnerableAppTestCase(unittest.TestCase):
     # Test 15: Admin access with authentication
     def test_admin_with_auth(self):
         """Test admin endpoint with authentication"""
-        with self.client.session_transaction() as sess:
-            sess['authenticated'] = True
-            sess['user'] = 'testuser'
-        
-        response = self.client.get('/admin')
-        self.assertEqual(response.status_code, 200)
-        data = response.get_json()
-        self.assertIn('admin_data', data)
+        # Fixed: Use login endpoint to set session instead of session_transaction()
+        # session_transaction() has compatibility issues with Werkzeug 2.3.x
+        with self.client:
+            self.client.post('/login', data={'username': 'testuser', 'password': 'testpass'})
+            response = self.client.get('/admin')
+            self.assertEqual(response.status_code, 200)
+            data = response.get_json()
+            self.assertIn('admin_data', data)
     
     # Test 16: Database initialization
     def test_database_initialized(self):
