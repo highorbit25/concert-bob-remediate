@@ -1,0 +1,64 @@
+name: Bob Shell CI
+
+on:
+  issues:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: 'Custom prompt (else analyzes repo by default)'
+        required: false
+      issue_number:
+        description: 'Issue number to fix (leave empty for default behavior)'
+        required: false
+
+jobs:
+  bob-shell:
+    runs-on: ubuntu-latest
+    name: Run Bob Shell Analysis with GitHub MCP
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'bob-fix'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      
+      - name: Set Prompt
+        id: set-prompt
+        run: |
+          REPO_OWNER="${{ github.repository_owner }}"
+          REPO_NAME="${{ github.event.repository.name }}"
+          
+          if [[ "${{ github.event_name }}" == "issues" ]]; then
+            # Triggered by issue event
+            ISSUE_NUM="${{ github.event.issue.number }}"
+            PROMPT="Research and fix the security vulnerability described in GitHub issue #${ISSUE_NUM} (https://github.com/${REPO_OWNER}/${REPO_NAME}/issues/${ISSUE_NUM}). Use GitHub MCP to fetch the issue details. The repository is already checked out locally, so use local file operations for reading and modifying code. Follow the instructions in @BOB_PROMPT.md to independently analyze the CVE, determine the best fix strategy, implement the solution, and create a comprehensive pull request."
+          elif [[ -n "${{ github.event.inputs.issue_number }}" ]]; then
+            # Manual workflow dispatch with issue number
+            ISSUE_NUM="${{ github.event.inputs.issue_number }}"
+            PROMPT="Research and fix the security vulnerability described in GitHub issue #${ISSUE_NUM} (https://github.com/${REPO_OWNER}/${REPO_NAME}/issues/${ISSUE_NUM}). Use GitHub MCP to fetch the issue details. The repository is already checked out locally, so use local file operations for reading and modifying code. Follow the instructions in @BOB_PROMPT.md to independently analyze the CVE, determine the best fix strategy, implement the solution, and create a comprehensive pull request."
+          elif [[ -n "${{ github.event.inputs.prompt }}" ]]; then
+            # Manual workflow dispatch with custom prompt
+            PROMPT="${{ github.event.inputs.prompt }}"
+          else
+            # Default prompt
+            PROMPT="Analyze this repository structure. The repository is checked out locally at the current working directory. List the main files and directories, and describe what this project does based on the README and code files."
+          fi
+          echo "prompt<<EOF" >> $GITHUB_OUTPUT
+          echo "$PROMPT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
+      - name: Run Bob Shell with GitHub MCP
+        id: bob-shell
+        uses: ./.github/actions/bob-shell
+        with:
+          bobshell_api_key: ${{ secrets.BOBSHELL_API_KEY }}
+          bobshell_debug: true
+          mcp: ${{ secrets.BOBSHELL_MCP_CONFIG }}
+          prompt: ${{ steps.set-prompt.outputs.prompt }}
+          settings: ${{ vars.BOBSHELL_SETTINGS }}
+    
