@@ -42,12 +42,6 @@ outputs:
   error:
     description: 'The error output from the Bob Shell execution, if any.'
     value: '${{ steps.bobshell_run.outputs.bobshell_errors }}'
-  pr_number:
-    description: 'The PR number extracted from the Bob Shell output, if any.'
-    value: '${{ steps.bobshell_run.outputs.pr_number }}'
-  pr_branch:
-    description: 'The PR branch name extracted from the Bob Shell output, if any.'
-    value: '${{ steps.bobshell_run.outputs.pr_branch }}'
 
 runs:
   using: 'composite'
@@ -154,34 +148,6 @@ runs:
         echo "bobshell_errors<<EOF" >> "${GITHUB_OUTPUT}"
         echo "${BOBSHELL_ERRORS}" >> "${GITHUB_OUTPUT}"
         echo "EOF" >> "${GITHUB_OUTPUT}"
-
-        # Extract PR number from the response if present
-        PR_NUM=""
-        # Try to extract from API URL (most reliable - from MCP JSON response)
-        PR_NUM=$(echo "${BOBSHELL_RESPONSE}" | grep -oP 'api\.github\.com/repos/[^/]+/[^/]+/pulls/\K\d+' | head -1)
-        # If that fails, try html_url pattern (from MCP JSON response)
-        if [[ -z "$PR_NUM" ]]; then
-          PR_NUM=$(echo "${BOBSHELL_RESPONSE}" | grep -oP 'github\.com/[^/]+/[^/]+/pull/\K\d+' | head -1)
-        fi
-        # If that fails, try "Created PR #" pattern (Bob's formatted completion message)
-        if [[ -z "$PR_NUM" ]]; then
-          PR_NUM=$(echo "${BOBSHELL_RESPONSE}" | grep -oP 'Created PR #\K\d+' | head -1)
-        fi
-        
-        if [[ -n "$PR_NUM" ]]; then
-          echo "pr_number=${PR_NUM}" >> "${GITHUB_OUTPUT}"
-          echo "✅ Extracted PR number: ${PR_NUM}"
-          
-          # Try to extract branch name if PR number was found
-          PR_BRANCH=$(echo "${BOBSHELL_RESPONSE}" | grep -oP '"head":\s*\{[^}]*"ref":\s*"\K[^"]+' | head -1)
-          if [[ -z "$PR_BRANCH" ]]; then
-            PR_BRANCH=$(echo "${BOBSHELL_RESPONSE}" | grep -oP 'Branch:\s*\K[^\s]+' | head -1)
-          fi
-          if [[ -n "$PR_BRANCH" ]]; then
-            echo "pr_branch=${PR_BRANCH}" >> "${GITHUB_OUTPUT}"
-            echo "✅ Extracted PR branch: ${PR_BRANCH}"
-          fi
-        fi
 
         if [[ "${FAILED}" = true ]]; then
           LAST_LINE="$(echo "${BOBSHELL_ERRORS}" | tail -n1)"

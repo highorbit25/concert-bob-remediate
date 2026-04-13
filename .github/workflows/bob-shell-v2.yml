@@ -40,8 +40,8 @@ jobs:
       (github.event_name == 'issues' && (github.event.action == 'opened' || github.event.label.name == 'cve-remediation')) ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_to_step == '1')
     outputs:
-      pr_number: ${{ steps.bob-devops.outputs.pr_number }}
-      pr_branch: ${{ steps.bob-devops.outputs.pr_branch }}
+      pr_number: ${{ steps.extract-pr.outputs.pr_number }}
+      pr_branch: ${{ steps.extract-pr.outputs.pr_branch }}
       issue_number: ${{ steps.get-issue.outputs.issue_number }}
     
     steps:
@@ -104,11 +104,46 @@ jobs:
             IMPORTANT: Only update package manifest files. Do NOT modify application code or tests.
           settings: ${{ vars.BOBSHELL_SETTINGS }}
       
+      - name: Extract PR Details
+        id: extract-pr
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BOBSHELL_RESPONSE='${{ steps.bob-devops.outputs.summary }}'
+
+          PR_NUM=$(echo "${BOBSHELL_RESPONSE}" | grep -oP 'api\.github\.com/repos/[^/]+/[^/]+/pulls/\K\d+' | head -1 || true)
+          if [[ -z "${PR_NUM}" ]]; then
+            PR_NUM=$(echo "${BOBSHELL_RESPONSE}" | grep -oP 'github\.com/[^/]+/[^/]+/pull/\K\d+' | head -1 || true)
+          fi
+          if [[ -z "${PR_NUM}" ]]; then
+            PR_NUM=$(echo "${BOBSHELL_RESPONSE}" | grep -oP 'Created PR #\K\d+' | head -1 || true)
+          fi
+
+          PR_BRANCH=""
+          if [[ -n "${PR_NUM}" ]]; then
+            PR_BRANCH=$(echo "${BOBSHELL_RESPONSE}" | grep -oP '"head":\s*\{[^}]*"ref":\s*"\K[^"]+' | head -1 || true)
+            if [[ -z "${PR_BRANCH}" ]]; then
+              PR_BRANCH=$(echo "${BOBSHELL_RESPONSE}" | grep -oP 'Branch:\s*\K[^\s]+' | head -1 || true)
+            fi
+          fi
+
+          echo "pr_number=${PR_NUM}" >> "${GITHUB_OUTPUT}"
+          echo "pr_branch=${PR_BRANCH}" >> "${GITHUB_OUTPUT}"
+
+          if [[ -n "${PR_NUM}" ]]; then
+            echo "✅ Extracted PR number: ${PR_NUM}"
+          fi
+          if [[ -n "${PR_BRANCH}" ]]; then
+            echo "✅ Extracted PR branch: ${PR_BRANCH}"
+          fi
+
       - name: Validate PR Creation
         id: validate-pr
+        shell: bash
         run: |
-          PR_NUM="${{ steps.bob-devops.outputs.pr_number }}"
-          PR_BRANCH="${{ steps.bob-devops.outputs.pr_branch }}"
+          PR_NUM="${{ steps.extract-pr.outputs.pr_number }}"
+          PR_BRANCH="${{ steps.extract-pr.outputs.pr_branch }}"
           
           if [[ -z "$PR_NUM" ]]; then
             echo "❌ Failed to extract PR number from Bob Shell output"
@@ -126,7 +161,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const prNumber = ${{ steps.bob-devops.outputs.pr_number }};
+            const prNumber = ${{ steps.extract-pr.outputs.pr_number }};
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -155,7 +190,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const prNumber = ${{ steps.bob-devops.outputs.pr_number }};
+            const prNumber = ${{ steps.extract-pr.outputs.pr_number }};
             await github.rest.pulls.requestReviewers({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -168,7 +203,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const prNumber = ${{ steps.bob-devops.outputs.pr_number }};
+            const prNumber = ${{ steps.extract-pr.outputs.pr_number }};
             await github.rest.issues.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
