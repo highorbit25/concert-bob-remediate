@@ -40,8 +40,8 @@ jobs:
       (github.event_name == 'issues' && (github.event.action == 'opened' || github.event.label.name == 'cve-remediation')) ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_to_step == '1')
     outputs:
-      pr_number: ${{ steps.extract-pr.outputs.pr_number }}
-      pr_branch: ${{ steps.extract-pr.outputs.pr_branch }}
+      pr_number: ${{ steps.bob-devops.outputs.pr_number }}
+      pr_branch: ${{ steps.bob-devops.outputs.pr_branch }}
       issue_number: ${{ steps.get-issue.outputs.issue_number }}
     
     steps:
@@ -105,53 +105,29 @@ jobs:
           settings: ${{ vars.BOBSHELL_SETTINGS }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Extract PR Information
-        id: extract-pr
+      - name: Validate PR Creation
+        id: validate-pr
         run: |
-          # Extract PR number from Bob's output
-          BOB_OUTPUT="${{ steps.bob-devops.outputs.summary }}"
-          echo "Bob output: ${BOB_OUTPUT}"
-          
-          # Try to extract PR number from API URL (most reliable)
-          PR_NUM=$(echo "${BOB_OUTPUT}" | grep -oP 'api\.github\.com/repos/[^/]+/[^/]+/pulls/\K\d+' | head -1)
-          
-          # If that fails, try html_url pattern
-          if [[ -z "$PR_NUM" ]]; then
-            PR_NUM=$(echo "${BOB_OUTPUT}" | grep -oP 'github\.com/[^/]+/[^/]+/pull/\K\d+' | head -1)
-          fi
-          
-          # If that fails, try "number" field in JSON
-          if [[ -z "$PR_NUM" ]]; then
-            PR_NUM=$(echo "${BOB_OUTPUT}" | grep -oP '"number":\s*\K\d+' | head -1)
-          fi
-          
-          # If that fails, try PR # pattern
-          if [[ -z "$PR_NUM" ]]; then
-            PR_NUM=$(echo "${BOB_OUTPUT}" | grep -oP 'PR #\K\d+' | head -1)
-          fi
+          PR_NUM="${{ steps.bob-devops.outputs.pr_number }}"
+          PR_BRANCH="${{ steps.bob-devops.outputs.pr_branch }}"
           
           if [[ -z "$PR_NUM" ]]; then
-            echo "❌ Failed to find PR number"
-            echo "Bob output was: ${BOB_OUTPUT}"
+            echo "❌ Failed to extract PR number from Bob Shell output"
+            echo "Bob output was: ${{ steps.bob-devops.outputs.summary }}"
             exit 1
           fi
           
-          echo "pr_number=${PR_NUM}" >> $GITHUB_OUTPUT
-          echo "✅ Found PR #${PR_NUM}"
-          
-          # Get PR branch name
-          PR_BRANCH=$(gh pr view "${PR_NUM}" --json headRefName -q .headRefName)
-          echo "pr_branch=${PR_BRANCH}" >> $GITHUB_OUTPUT
-          echo "✅ PR Branch: ${PR_BRANCH}"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          echo "✅ PR #${PR_NUM} created successfully"
+          if [[ -n "$PR_BRANCH" ]]; then
+            echo "✅ PR Branch: ${PR_BRANCH}"
+          fi
       
       - name: Add Approval Request Comment
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const prNumber = ${{ steps.extract-pr.outputs.pr_number }};
+            const prNumber = ${{ steps.bob-devops.outputs.pr_number }};
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -180,7 +156,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const prNumber = ${{ steps.extract-pr.outputs.pr_number }};
+            const prNumber = ${{ steps.bob-devops.outputs.pr_number }};
             await github.rest.pulls.requestReviewers({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -193,7 +169,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const prNumber = ${{ steps.extract-pr.outputs.pr_number }};
+            const prNumber = ${{ steps.bob-devops.outputs.pr_number }};
             await github.rest.issues.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
