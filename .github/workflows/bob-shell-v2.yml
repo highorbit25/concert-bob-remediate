@@ -66,10 +66,10 @@ jobs:
           echo "issue_number=${ISSUE_NUM}" >> $GITHUB_OUTPUT
           echo "📋 Processing Issue #${ISSUE_NUM}"
       
-      # - name: Configure Git
-      #   run: |
-      #     git config --global user.name "github-actions[bot]"
-      #     git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
       
       - name: Create Concert API Credentials File
         run: |
