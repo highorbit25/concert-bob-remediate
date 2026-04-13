@@ -1,0 +1,511 @@
+name: Bob Shell V2 - CVE Remediation with Approvals
+
+on:
+  issues:
+    types: [opened, labeled]
+  pull_request_review:
+    types: [submitted]
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'GitHub Issue number for CVE remediation'
+        required: true
+        type: number
+      skip_to_step:
+        description: 'Skip to specific step (1=DevOps, 2=Unit Test, 3=Code Fix)'
+        required: false
+        type: choice
+        options:
+          - '1'
+          - '2'
+          - '3'
+        default: '1'
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: write
+
+jobs:
+  # ============================================================================
+  # STEP 1: DevOps Concert Mode - Research CVE and Create PR
+  # ============================================================================
+  devops-cve-research:
+    name: "Step 1: DevOps - Research CVE & Create PR"
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'issues' && (github.event.action == 'opened' || github.event.label.name == 'cve-remediation')) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_to_step == '1')
+    outputs:
+      pr_number: ${{ steps.extract-pr.outputs.pr_number }}
+      pr_branch: ${{ steps.extract-pr.outputs.pr_branch }}
+      issue_number: ${{ steps.get-issue.outputs.issue_number }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      
+      - name: Get Issue Number
+        id: get-issue
+        run: |
+          if [[ "${{ github.event_name }}" == "issues" ]]; then
+            ISSUE_NUM="${{ github.event.issue.number }}"
+          else
+            ISSUE_NUM="${{ github.event.inputs.issue_number }}"
+          fi
+          echo "issue_number=${ISSUE_NUM}" >> $GITHUB_OUTPUT
+          echo "📋 Processing Issue #${ISSUE_NUM}"
+      
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Create Concert API Credentials File
+        run: |
+          cat > .env << EOF
+          CONCERT_API_KEY="${{ secrets.CONCERT_API_KEY }}"
+          CONCERT_HOSTNAME="${{ secrets.CONCERT_HOSTNAME }}"
+          CONCERT_INSTANCE_ID="${{ secrets.CONCERT_INSTANCE_ID }}"
+          EOF
+          echo "✅ Concert API credentials configured"
+      
+      - name: Run Bob Shell - DevOps Concert Mode
+        id: bob-devops
+        uses: ./.github/actions/bob-shell
+        with:
+          bobshell_api_key: ${{ secrets.BOBSHELL_API_KEY }}
+          bobshell_debug: true
+          mcp: ${{ secrets.BOBSHELL_MCP_CONFIG }}
+          prompt: |
+            Switch to devops-concert mode and process GitHub issue #${{ steps.get-issue.outputs.issue_number }}.
+            
+            Concert API credentials are available in the .env file in the repository root.
+            
+            Follow this workflow:
+            1. Fetch the issue details from https://github.com/${{ github.repository }}/issues/${{ steps.get-issue.outputs.issue_number }}
+            2. Research the CVE using Concert API (source .env for credentials: CONCERT_API_KEY, CONCERT_HOSTNAME, CONCERT_INSTANCE_ID)
+            3. Apply the package fix to the manifest files (requirements.txt, package.json, etc.)
+            4. Create a branch following the naming convention: fix/cve-{CVE-ID}-{package-name}
+            5. Commit the changes with a descriptive message
+            6. Push the branch to origin
+            7. Create a pull request with comprehensive CVE details and Concert recommendations
+            
+            IMPORTANT: Only update package manifest files. Do NOT modify application code or tests.
+          settings: ${{ vars.BOBSHELL_SETTINGS }}
+      
+      - name: Extract PR Information
+        id: extract-pr
+        run: |
+          # Extract PR number from Bob's output
+          PR_NUM=$(echo "${{ steps.bob-devops.outputs.summary }}" | grep -oP 'PR #\K\d+' | head -1)
+          if [[ -z "$PR_NUM" ]]; then
+            echo "❌ Failed to extract PR number from Bob output"
+            exit 1
+          fi
+          echo "pr_number=${PR_NUM}" >> $GITHUB_OUTPUT
+          echo "✅ Created PR #${PR_NUM}"
+          
+          # Get PR branch name
+          PR_BRANCH=$(gh pr view ${PR_NUM} --json headRefName -q .headRefName)
+          echo "pr_branch=${PR_BRANCH}" >> $GITHUB_OUTPUT
+          echo "✅ PR Branch: ${PR_BRANCH}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+      
+      - name: Add Approval Request Comment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = ${{ steps.extract-pr.outputs.pr_number }};
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: `## 🔐 DevOps Approval Required
+              
+              This PR contains package upgrades to fix a security vulnerability.
+              
+              **Next Steps:**
+              1. DevOps Engineer: Review the package changes
+              2. **Approve this PR** to trigger the next phase (unit tests will run automatically)
+              3. If you need to reject, close this PR with a comment
+              
+              **To approve:** Click "Review changes" → "Approve" → "Submit review"
+              
+              ⏸️ Workflow paused - waiting for your approval (no timeout, will wait indefinitely)...
+              
+              Once approved, the workflow will automatically:
+              - Run unit tests
+              - Fix any failing tests if needed
+              - Request Software Lead review`
+            });
+      
+      - name: Request DevOps Review
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = ${{ steps.extract-pr.outputs.pr_number }};
+            await github.rest.pulls.requestReviewers({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              reviewers: ['highorbit25']  // DevOps Engineer
+            });
+      
+      - name: Add workflow metadata label
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = ${{ steps.extract-pr.outputs.pr_number }};
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              labels: ['cve-remediation-workflow', 'awaiting-devops-approval']
+            });
+
+  # ============================================================================
+  # STEP 2: Run Unit Tests After DevOps Approval
+  # ============================================================================
+  run-unit-tests-after-approval:
+    name: "Step 2: Run Unit Tests (After Approval)"
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'pull_request_review' &&
+      github.event.review.state == 'approved' &&
+      github.event.review.user.login == 'highorbit25' &&
+      contains(github.event.pull_request.labels.*.name, 'cve-remediation-workflow')
+    outputs:
+      tests_passed: ${{ steps.run-tests.outputs.tests_passed }}
+      pr_number: ${{ github.event.pull_request.number }}
+      pr_branch: ${{ github.event.pull_request.head.ref }}
+    
+    steps:
+      - name: Update PR Status
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            
+            // Remove awaiting approval label
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                name: 'awaiting-devops-approval'
+              });
+            } catch (e) {
+              console.log('Label may not exist:', e.message);
+            }
+            
+            // Add running tests label
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              labels: ['running-unit-tests']
+            });
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: `## ✅ DevOps Approval Received!
+              
+              Thank you @${{ github.event.review.user.login }} for approving the package upgrade.
+              
+              🧪 Running unit tests now...`
+            });
+      
+      - name: Checkout PR Branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        id: install-deps
+        working-directory: app/vulnerable
+        run: pip install -r requirements.txt
+        continue-on-error: true
+      
+      - name: Run unit tests
+        id: run-tests
+        working-directory: app/vulnerable
+        run: |
+          python -m unittest test_main.py -v
+          if [[ $? -eq 0 ]]; then
+            echo "tests_passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "tests_passed=false" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+      
+      - name: Report Test Results
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const testsPassed = '${{ steps.run-tests.outputs.tests_passed }}' === 'true';
+            
+            // Remove running tests label
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                name: 'running-unit-tests'
+              });
+            } catch (e) {
+              console.log('Label may not exist:', e.message);
+            }
+            
+            if (testsPassed) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: ['tests-passed', 'ready-for-software-lead-review']
+              });
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: `## ✅ Unit Tests Passed!
+                
+                All unit tests passed successfully after the package upgrade.
+                
+                **Next Steps:**
+                - Requesting Software Lead review for final approval
+                - Once approved, this PR can be merged
+                
+                @amrupapz Please review and approve for merge.`
+              });
+              
+              // Request Software Lead review
+              await github.rest.pulls.requestReviewers({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                reviewers: ['amrupapz']
+              });
+            } else {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: ['tests-failed', 'needs-code-remediation']
+              });
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: `## ❌ Unit Tests Failed
+                
+                The unit tests failed after the package upgrade. Code changes are needed.
+                
+                **Next Steps:**
+                - Bob will now analyze the failures and fix the code
+                - This will happen automatically in the next workflow job
+                
+                ⏳ Starting code remediation...`
+              });
+            }
+
+  # ============================================================================
+  # STEP 3: Fix Failing Tests (if needed)
+  # ============================================================================
+  fix-failing-tests:
+    name: "Step 3: Fix Failing Unit Tests"
+    runs-on: ubuntu-latest
+    needs: run-unit-tests-after-approval
+    if: |
+      always() &&
+      needs.run-unit-tests-after-approval.result == 'success' &&
+      needs.run-unit-tests-after-approval.outputs.tests_passed == 'false'
+    
+    steps:
+      - name: Checkout PR Branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.run-unit-tests-after-approval.outputs.pr_branch }}
+          fetch-depth: 0
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Run Bob Shell - Vuln Remediation Mode
+        id: bob-remediation
+        uses: ./.github/actions/bob-shell
+        with:
+          bobshell_api_key: ${{ secrets.BOBSHELL_API_KEY }}
+          bobshell_debug: true
+          mcp: ${{ secrets.BOBSHELL_MCP_CONFIG }}
+          prompt: |
+            Switch to vuln-remediation-concert mode and fix the failing unit tests in PR #${{ needs.run-unit-tests-after-approval.outputs.pr_number }}.
+            
+            Follow this workflow:
+            1. Analyze the PR at https://github.com/${{ github.repository }}/pull/${{ needs.run-unit-tests-after-approval.outputs.pr_number }}
+            2. Understand what package was upgraded and why tests are failing
+            3. Run the unit tests locally to see the exact failures
+            4. Fix the code to work with the upgraded package
+            5. Verify all tests pass
+            6. Commit your fixes to the EXISTING PR branch: ${{ needs.run-unit-tests-after-approval.outputs.pr_branch }}
+            7. Push the changes
+            8. Add a comment to the PR documenting what was fixed
+            
+            CRITICAL: Commit to branch "${{ needs.run-unit-tests-after-approval.outputs.pr_branch }}" - do NOT create a new branch!
+          settings: ${{ vars.BOBSHELL_SETTINGS }}
+      
+      - name: Verify Tests Now Pass
+        id: verify-tests
+        working-directory: app/vulnerable
+        run: |
+          pip install -r requirements.txt
+          python -m unittest test_main.py -v
+        continue-on-error: true
+      
+      - name: Report Remediation Results
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = ${{ needs.run-unit-tests-after-approval.outputs.pr_number }};
+            const testsNowPass = '${{ steps.verify-tests.outcome }}' === 'success';
+            
+            // Remove needs remediation label
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                name: 'needs-code-remediation'
+              });
+            } catch (e) {
+              console.log('Label may not exist:', e.message);
+            }
+            
+            if (testsNowPass) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: ['tests-passed', 'ready-for-software-lead-review']
+              });
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: `## ✅ Code Remediation Complete!
+                
+                Bob has successfully fixed the failing unit tests. All tests now pass.
+                
+                **Next Steps:**
+                - Requesting Software Lead review for final approval
+                - Once approved, this PR can be merged
+                
+                @amrupapz Please review the code fixes and approve for merge.`
+              });
+              
+              // Request Software Lead review
+              await github.rest.pulls.requestReviewers({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                reviewers: ['amrupapz']
+              });
+            } else {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: ['tests-failed', 'needs-manual-intervention']
+              });
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: `## ⚠️ Additional Fixes May Be Needed
+                
+                Bob attempted to fix the failing tests, but some tests may still be failing.
+                Manual intervention may be required.
+                
+                @highorbit25 Please review the changes and continue the remediation.`
+              });
+              
+              // Assign to SWE for manual review
+              await github.rest.issues.addAssignees({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                assignees: ['highorbit25']
+              });
+            }
+
+  # ============================================================================
+  # STEP 4: Handle PR Closure (Rejection)
+  # ============================================================================
+  handle-pr-closure:
+    name: "Handle PR Rejection"
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == false &&
+      contains(github.event.pull_request.labels.*.name, 'cve-remediation-workflow')
+    
+    steps:
+      - name: Report Rejection
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: `## ❌ CVE Remediation Workflow Cancelled
+              
+              This PR was closed without merging. The CVE remediation workflow has been cancelled.
+              
+              If this was a mistake, you can:
+              1. Reopen this PR to continue the workflow
+              2. Create a new issue to start a fresh remediation workflow
+              
+              Workflow terminated.`
+            });
+
+# Made with Bob
