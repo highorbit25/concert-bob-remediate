@@ -157,15 +157,15 @@ runs:
 
         # Extract PR number from the response if present
         PR_NUM=""
-        # Try to extract from API URL (most reliable)
+        # Try to extract from API URL (most reliable - from MCP JSON response)
         PR_NUM=$(echo "${BOBSHELL_RESPONSE}" | grep -oP 'api\.github\.com/repos/[^/]+/[^/]+/pulls/\K\d+' | head -1)
-        # If that fails, try html_url pattern
+        # If that fails, try html_url pattern (from MCP JSON response)
         if [[ -z "$PR_NUM" ]]; then
           PR_NUM=$(echo "${BOBSHELL_RESPONSE}" | grep -oP 'github\.com/[^/]+/[^/]+/pull/\K\d+' | head -1)
         fi
-        # If that fails, try PR # pattern
+        # If that fails, try "Created PR #" pattern (Bob's formatted completion message)
         if [[ -z "$PR_NUM" ]]; then
-          PR_NUM=$(echo "${BOBSHELL_RESPONSE}" | grep -oP 'PR #\K\d+' | head -1)
+          PR_NUM=$(echo "${BOBSHELL_RESPONSE}" | grep -oP 'Created PR #\K\d+' | head -1)
         fi
         
         if [[ -n "$PR_NUM" ]]; then
