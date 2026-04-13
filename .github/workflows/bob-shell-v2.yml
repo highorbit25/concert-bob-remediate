@@ -112,12 +112,22 @@ jobs:
           BOB_OUTPUT="${{ steps.bob-devops.outputs.summary }}"
           echo "Bob output: ${BOB_OUTPUT}"
           
-          # Try to extract PR number using multiple patterns
-          PR_NUM=$(echo "${BOB_OUTPUT}" | grep -oP 'PR #\K\d+' | head -1)
+          # Try to extract PR number from API URL (most reliable)
+          PR_NUM=$(echo "${BOB_OUTPUT}" | grep -oP 'api\.github\.com/repos/[^/]+/[^/]+/pulls/\K\d+' | head -1)
           
-          # If that fails, try alternative pattern
+          # If that fails, try html_url pattern
           if [[ -z "$PR_NUM" ]]; then
-            PR_NUM=$(echo "${BOB_OUTPUT}" | grep -oP 'pull/\K\d+' | head -1)
+            PR_NUM=$(echo "${BOB_OUTPUT}" | grep -oP 'github\.com/[^/]+/[^/]+/pull/\K\d+' | head -1)
+          fi
+          
+          # If that fails, try "number" field in JSON
+          if [[ -z "$PR_NUM" ]]; then
+            PR_NUM=$(echo "${BOB_OUTPUT}" | grep -oP '"number":\s*\K\d+' | head -1)
+          fi
+          
+          # If that fails, try PR # pattern
+          if [[ -z "$PR_NUM" ]]; then
+            PR_NUM=$(echo "${BOB_OUTPUT}" | grep -oP 'PR #\K\d+' | head -1)
           fi
           
           if [[ -z "$PR_NUM" ]]; then

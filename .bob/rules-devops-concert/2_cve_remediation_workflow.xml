@@ -260,6 +260,32 @@
         <step>Add relevant labels (security, cve, dependencies)</step>
         <step>Link to original issue</step>
       </steps>
+      <completion_message_format>
+        <requirement>
+          When completing the task, ALWAYS extract and mention the PR URL and number from the MCP tool response
+        </requirement>
+        <template>
+          ✅ CVE remediation complete:
+          - Created PR #{pr_number}: {pr_title}
+          - PR URL: {html_url}
+          - Branch: {branch_name}
+          - Package: {package} upgraded from {old_version} to {new_version}
+          - Resolves issue #{issue_number}
+        </template>
+        <example>
+          ✅ CVE remediation complete:
+          - Created PR #39: 🔒 Security Fix: CVE-2025-27516 - Upgrade jinja2 to 3.1.6
+          - PR URL: https://github.com/highorbit25/concert-bob-remediate/pull/39
+          - Branch: fix/cve-2025-27516-jinja2
+          - Package: jinja2 upgraded from 3.0.3 to 3.1.6
+          - Resolves issue #38
+        </example>
+        <critical_note>
+          The PR URL MUST be extracted from the "url" or "html_url" field in the create_pull_request MCP tool response JSON.
+          Example: "url": "https://api.github.com/repos/owner/repo/pulls/39"
+          This allows the GitHub Actions workflow to reliably parse and extract the PR number for subsequent steps.
+        </critical_note>
+      </completion_message_format>
     </phase>
   </workflow_phases>
 
