@@ -151,8 +151,9 @@ jobs:
           bobshell_api_key: ${{ secrets.BOBSHELL_API_KEY }}
           bobshell_debug: true
           mcp: ${{ secrets.BOBSHELL_MCP_CONFIG }}
+          chat_mode: devops-concert
           prompt: |
-            Switch to devops-concert mode and process GitHub issue #${{ steps.get-issue.outputs.issue_number }}.
+            Process GitHub issue #${{ steps.get-issue.outputs.issue_number }}.
             
             Concert API credentials are available in the .env file in the repository root.
             
@@ -468,8 +469,9 @@ jobs:
           bobshell_api_key: ${{ secrets.BOBSHELL_API_KEY }}
           bobshell_debug: true
           mcp: ${{ secrets.BOBSHELL_MCP_CONFIG }}
+          chat_mode: vuln-remediation-concert
           prompt: |
-            Switch to vuln-remediation-concert mode and fix the failing unit tests in PR #${{ needs.run-unit-tests-after-approval.outputs.pr_number }}.
+            Fix the failing unit tests in PR #${{ needs.run-unit-tests-after-approval.outputs.pr_number }}.
             
             Follow this workflow:
             1. Analyze the PR at https://github.com/${{ github.repository }}/pull/${{ needs.run-unit-tests-after-approval.outputs.pr_number }}

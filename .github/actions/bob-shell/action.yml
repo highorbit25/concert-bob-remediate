@@ -29,6 +29,9 @@ inputs:
     description: 'A string passed to Bob Shell `--prompt` argument.'
     required: false
     default: 'You are a helpful assistant.'
+  chat_mode:
+    description: 'The chat mode slug to use (e.g., "devops-concert", "vuln-remediation-concert"). Passed to Bob Shell `--chat-mode` argument.'
+    required: false
   settings:
     description: 'A JSON string written to `.bob/settings.json` to configure Bob Shell project settings.'
     required: false
@@ -123,14 +126,22 @@ runs:
         # Keep track of whether we've failed
         FAILED=false
 
+        # Build Bob Shell command with optional chat mode
+        BOB_CMD="bob --yolo"
+        if [[ -n "${CHAT_MODE:-}" ]]; then
+          BOB_CMD="${BOB_CMD} --chat-mode=${CHAT_MODE}"
+          echo "Using chat mode: ${CHAT_MODE}"
+        fi
+        BOB_CMD="${BOB_CMD} \"${PROMPT}\""
+        
         # Run Bob Shell with the provided prompt, streaming responses in debug
         if [[ "${DEBUG}" = true ]]; then
           echo "::warning::Bob Shell debug logging is enabled. This will stream responses, which could reveal sensitive information if processed with untrusted inputs."
-          if ! { bob --yolo "${PROMPT}" 2> >(tee "${TEMP_STDERR}" >&2) | tee "${TEMP_STDOUT}"; }; then
+          if ! { eval ${BOB_CMD} 2> >(tee "${TEMP_STDERR}" >&2) | tee "${TEMP_STDOUT}"; }; then
             FAILED=true
           fi
         else
-          if ! bob --yolo "${PROMPT}" 2> "${TEMP_STDERR}" 1> "${TEMP_STDOUT}"; then
+          if ! eval ${BOB_CMD} 2> "${TEMP_STDERR}" 1> "${TEMP_STDOUT}"; then
             FAILED=true
           fi
         fi
@@ -159,6 +170,7 @@ runs:
         DEBUG: '${{ fromJSON(inputs.bobshell_debug || false) }}'
         BOBSHELL_API_KEY: '${{ inputs.bobshell_api_key }}'
         PROMPT: '${{ inputs.prompt }}'
+        CHAT_MODE: '${{ inputs.chat_mode }}'
         SETTINGS: '${{ inputs.settings }}'
         GH_TOKEN: '${{ github.token }}'
 
