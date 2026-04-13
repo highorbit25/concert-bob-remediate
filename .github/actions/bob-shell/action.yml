@@ -160,6 +160,7 @@ runs:
         BOBSHELL_API_KEY: '${{ inputs.bobshell_api_key }}'
         PROMPT: '${{ inputs.prompt }}'
         SETTINGS: '${{ inputs.settings }}'
+        GH_TOKEN: '${{ github.token }}'
 
 branding:
   icon: 'terminal'
