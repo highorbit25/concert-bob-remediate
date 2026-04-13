@@ -20,8 +20,10 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
+        id: install-deps
         working-directory: app/vulnerable
         run: pip install -r requirements.txt
+        continue-on-error: true
 
       - name: Run unit tests
         id: run-tests
@@ -34,17 +36,19 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const testsPassed = ${{ steps.run-tests.outcome == 'success' }};
+            const installSuccess = '${{ steps.install-deps.outcome }}' === 'success';
+            const testsSuccess = '${{ steps.run-tests.outcome }}' === 'success';
+            const allPassed = installSuccess && testsSuccess;
             const prNumber = context.payload.pull_request.number;
             
-            if (testsPassed) {
-              // Tests passed - assign to Software Lead for code review
-              console.log('✅ Tests passed - assigning to Software Lead');
-              await github.rest.issues.addAssignees({
+            if (allPassed) {
+              // All steps passed - request review from Software Lead
+              console.log('✅ All checks passed - requesting review from Software Lead');
+              await github.rest.pulls.requestReviewers({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: prNumber,
-                assignees: ['swe-lead']
+                pull_number: prNumber,
+                reviewers: ['swe-lead']
               });
               
               // Add success comment
@@ -52,11 +56,19 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: prNumber,
-                body: '✅ **Unit tests passed!** Assigned to @swe-lead for code review and approval.'
+                body: '✅ **All checks passed!** Dependencies installed successfully and unit tests passed. Requested review from @swe-lead for code review and approval.'
               });
             } else {
-              // Tests failed - assign to SWE for resolution
-              console.log('❌ Tests failed - assigning to SWE');
+              // Something failed - assign to SWE for resolution
+              let failureReason = '';
+              if (!installSuccess) {
+                failureReason = 'Dependency installation failed';
+                console.log('❌ Dependency installation failed - assigning to SWE');
+              } else if (!testsSuccess) {
+                failureReason = 'Unit tests failed';
+                console.log('❌ Unit tests failed - assigning to SWE');
+              }
+              
               await github.rest.issues.addAssignees({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -69,10 +81,10 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: prNumber,
-                body: '❌ **Unit tests failed!** Assigned to @swe-user to resolve test failures. Please check the workflow logs for details.'
+                body: `❌ **${failureReason}!** Assigned to @swe-user to resolve the issues. Please check the workflow logs for details.`
               });
             }
 
       - name: Set final status
-        if: steps.run-tests.outcome == 'failure'
+        if: steps.install-deps.outcome == 'failure' || steps.run-tests.outcome == 'failure'
         run: exit 1
