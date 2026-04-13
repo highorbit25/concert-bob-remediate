@@ -71,14 +71,15 @@ runs:
     - name: 'Configure Bob Shell'
       run: |-
         if [[ "${SETTINGS:-}" || "${MCP:-}" ]]; then
-          mkdir -p .bob/
           if [[ "${SETTINGS:-}" ]]; then
+            mkdir -p .bob/
             echo "Configuring Bob Shell project settings."
             echo "${SETTINGS}" > ".bob/settings.json"
           fi
           if [[ "${MCP:-}" ]]; then
-            echo "Configuring Bob Shell MCP settings."
-            echo "${MCP}" > ".bob/mcp.json"
+            mkdir -p "${HOME}/.bob"
+            echo "Configuring Bob Shell MCP settings in global context."
+            echo "${MCP}" > "${HOME}/.bob/mcp_settings.json"
           fi
         else
           echo "Nothing to configure."
