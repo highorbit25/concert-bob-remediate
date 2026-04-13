@@ -1,0 +1,348 @@
+<cve_remediation_workflow>
+  <overview>
+    Complete workflow for CVE remediation using Concert API and GitHub integration.
+    This workflow focuses on package manifest updates only. Unit test and code remediation will be handled separately in a different workflow.
+  </overview>
+
+  <workflow_phases>
+    <phase number="1" name="issue_identification">
+      <title>Identify CVE Issues</title>
+      <description>
+        Fetch and analyze GitHub issues assigned to the DevOps engineer
+      </description>
+      <steps>
+        <step>Use GitHub MCP list_issues with assignee filter</step>
+        <step>Parse issue descriptions for CVE IDs (CVE-YYYY-XXXXX format)</step>
+        <step>Extract package names and application context</step>
+        <step>Identify priority based on severity labels</step>
+      </steps>
+      <output>
+        List of CVE issues with extracted metadata (CVE ID, package, application)
+      </output>
+    </phase>
+
+    <phase number="2" name="concert_research">
+      <title>Research CVE in Concert</title>
+      <description>
+        Query Concert API to understand vulnerability and get recommendations
+      </description>
+      <prerequisites>
+        <prerequisite>Load CONCERT_API_KEY from .env</prerequisite>
+        <prerequisite>Load CONCERT_HOSTNAME from .env</prerequisite>
+        <prerequisite>Load CONCERT_INSTANCE_ID from .env</prerequisite>
+      </prerequisites>
+      <steps>
+        <step>
+          <action>Source .env file to load Concert credentials</action>
+          <command>source .env</command>
+        </step>
+        <step>
+          <action>List applications to find target application</action>
+          <endpoint>GET ${CONCERT_HOSTNAME}/concert/core/api/v1/applications</endpoint>
+          <headers>
+            <header>Authorization: ${CONCERT_API_KEY}</header>
+            <header>InstanceId: ${CONCERT_INSTANCE_ID}</header>
+          </headers>
+        </step>
+        <step>
+          <action>Get vulnerability details for application</action>
+          <endpoint>GET ${CONCERT_HOSTNAME}/concert/core/api/v1/applications/{id}/vulnerability_details</endpoint>
+        </step>
+        <step>
+          <action>Fetch package recommendations</action>
+          <endpoint>GET ${CONCERT_HOSTNAME}/concert/core/api/v1/software_composition/recommendations</endpoint>
+          <filters>
+            <filter>Filter by package name</filter>
+            <filter>Filter by CVE ID if available</filter>
+          </filters>
+        </step>
+      </steps>
+      <output>
+        Concert's recommended package version and upgrade path
+      </output>
+    </phase>
+
+    <phase number="3" name="branch_creation">
+      <title>Create Remediation Branch</title>
+      <description>
+        Create a dedicated branch for the CVE fix BEFORE making any changes
+      </description>
+      <branch_naming>
+        <format>fix/cve-{CVE-ID}-{package-name}</format>
+        <example>fix/cve-2023-12345-flask</example>
+      </branch_naming>
+      <critical_workflow>
+        <rule priority="critical">
+          ALWAYS create and checkout the branch BEFORE making any file changes
+        </rule>
+        <rule priority="critical">
+          DO NOT modify files on main/master branch
+        </rule>
+        <rule priority="critical">
+          All changes must be made on the fix branch
+        </rule>
+      </critical_workflow>
+      <steps>
+        <step number="1">
+          <action>Use GitHub MCP create_branch tool to create the branch remotely</action>
+          <tool>use_mcp_tool with github/create_branch</tool>
+          <parameters>
+            <parameter>owner: repository owner</parameter>
+            <parameter>repo: repository name</parameter>
+            <parameter>branch: fix/cve-{CVE-ID}-{package-name}</parameter>
+            <parameter>from_branch: main (or master)</parameter>
+          </parameters>
+        </step>
+        <step number="2">
+          <action>Checkout the newly created branch locally</action>
+          <command>git checkout fix/cve-{CVE-ID}-{package-name}</command>
+          <note>This ensures all subsequent changes are made on the fix branch</note>
+        </step>
+        <step number="3">
+          <action>Verify you are on the correct branch</action>
+          <command>git branch --show-current</command>
+          <expected_output>fix/cve-{CVE-ID}-{package-name}</expected_output>
+        </step>
+      </steps>
+      <alternative_approach>
+        <description>If GitHub MCP is unavailable, use local git commands</description>
+        <commands>
+          <command>git checkout -b fix/cve-{CVE-ID}-{package-name}</command>
+          <command>git push -u origin fix/cve-{CVE-ID}-{package-name}</command>
+        </commands>
+      </alternative_approach>
+    </phase>
+
+    <phase number="4" name="package_update">
+      <title>Update Package Manifests (ON FIX BRANCH)</title>
+      <description>
+        Apply Concert's recommended package version to manifest files.
+        CRITICAL: Ensure you are on the fix branch before making changes.
+      </description>
+      <pre_change_verification>
+        <check>Verify current branch is the fix branch (not main/master)</check>
+        <command>git branch --show-current</command>
+        <abort_if>Current branch is main or master</abort_if>
+      </pre_change_verification>
+      <scope_restrictions>
+        <restriction priority="critical">
+          ONLY modify package manifest files (requirements.txt, package.json, pom.xml, etc.)
+        </restriction>
+        <restriction priority="critical">
+          DO NOT modify application source code
+        </restriction>
+        <restriction priority="critical">
+          DO NOT modify test files
+        </restriction>
+        <restriction priority="critical">
+          DO NOT run unit tests or validation commands
+        </restriction>
+        <restriction priority="high">
+          If package upgrade appears to require code changes, document this in the PR but DO NOT attempt to fix it in this mode
+        </restriction>
+      </scope_restrictions>
+      <manifest_types>
+        <manifest type="python">
+          <file>requirements.txt</file>
+          <format>
+            # Before
+            {package}=={old_version}  # CVE-{CVE-ID}
+            
+            # After
+            {package}=={new_version}  # Fixed CVE-{CVE-ID} per Concert recommendation
+          </format>
+        </manifest>
+        <manifest type="nodejs">
+          <file>package.json</file>
+          <format>
+            {
+              "dependencies": {
+                "{package}": "^{new_version}"  // Fixed CVE-{CVE-ID} per Concert
+              }
+            }
+          </format>
+        </manifest>
+        <manifest type="java">
+          <file>pom.xml</file>
+          <format>
+            <![CDATA[
+            <dependency>
+              <groupId>{group}</groupId>
+              <artifactId>{artifact}</artifactId>
+              <version>{new_version}</version> <!-- Fixed CVE-{CVE-ID} -->
+            </dependency>
+            ]]>
+          </format>
+        </manifest>
+      </manifest_types>
+      <steps>
+        <step>Verify you are on the fix branch (not main)</step>
+        <step>Read current manifest file</step>
+        <step>Identify package version to update</step>
+        <step>Apply Concert's recommended version using apply_diff or write_to_file</step>
+        <step>Add comment explaining CVE fix</step>
+      </steps>
+    </phase>
+
+    <phase number="5" name="commit_and_push">
+      <title>Commit and Push Changes (ON FIX BRANCH)</title>
+      <description>
+        Commit package updates with detailed message and push to the fix branch
+      </description>
+      <commit_message_format>
+        <template>
+          fix: upgrade {package} to {version} for CVE-{ID}
+
+          - Addresses CVE-{ID} in {package}
+          - Upgraded from {old-version} to {new-version}
+          - Concert recommendation: {recommendation-details}
+          - Resolves #{issue-number}
+        </template>
+        <example>
+          fix: upgrade flask to 2.3.3 for CVE-2023-12345
+
+          - Addresses CVE-2023-12345 in flask
+          - Upgraded from 2.0.1 to 2.3.3
+          - Concert recommendation: Upgrade to 2.3.3 or later
+          - Resolves #456
+        </example>
+      </commit_message_format>
+      <steps>
+        <step>Use GitHub MCP push_files tool</step>
+        <step>Include all modified manifest files</step>
+        <step>Use formatted commit message</step>
+        <step>Push to remediation branch</step>
+      </steps>
+    </phase>
+
+    <phase number="6" name="pr_creation">
+      <title>Create Pull Request</title>
+      <description>
+        Create PR with comprehensive CVE and Concert details
+      </description>
+      <pr_title_format>
+        <template>fix: CVE-{CVE-ID} - Upgrade {package} to {version}</template>
+        <example>fix: CVE-2023-12345 - Upgrade flask to 2.3.3</example>
+      </pr_title_format>
+      <pr_description_template>
+        <template>
+          ## CVE Remediation
+
+          **CVE ID:** CVE-{CVE-ID}
+          **Package:** {package}
+          **Severity:** {severity}
+
+          ## Changes
+
+          - Upgraded {package} from {old-version} to {new-version}
+          - Applied Concert recommendation: {recommendation-details}
+
+          ## Concert Analysis
+
+          {concert-vulnerability-details}
+
+          ## Testing
+
+          CI/CD will validate this change. Unit test failures and code compatibility issues will be addressed in a separate workflow.
+
+          ## References
+
+          - Resolves #{issue-number}
+          - Concert Application: {application-name}
+          - Concert Recommendation ID: {recommendation-id}
+        </template>
+      </pr_description_template>
+      <steps>
+        <step>Use GitHub MCP create_pull_request tool</step>
+        <step>Set head branch to remediation branch</step>
+        <step>Set base branch to main/master</step>
+        <step>Use formatted title and description</step>
+        <step>Add relevant labels (security, cve, dependencies)</step>
+        <step>Link to original issue</step>
+      </steps>
+    </phase>
+  </workflow_phases>
+
+  <scope_boundaries>
+    <title>What This Mode Does and Does NOT Do</title>
+    <in_scope>
+      <item>Fetch GitHub issues assigned to the user</item>
+      <item>Research CVE details in Concert API</item>
+      <item>Get package upgrade recommendations from Concert</item>
+      <item>Update package manifest files (requirements.txt, package.json, pom.xml, etc.)</item>
+      <item>Create branches for CVE fixes</item>
+      <item>Commit manifest changes</item>
+      <item>Create pull requests with CVE details</item>
+    </in_scope>
+    <out_of_scope>
+      <item>Running unit tests</item>
+      <item>Fixing failing tests</item>
+      <item>Modifying application source code</item>
+      <item>Updating test files</item>
+      <item>Handling code compatibility issues</item>
+      <item>Fixing deprecated API usage</item>
+      <item>Resolving compilation errors</item>
+    </out_of_scope>
+    <rationale>
+      This mode focuses exclusively on the package upgrade decision and manifest updates.
+      Code remediation and test fixes are separate concerns handled in different workflows.
+      CI/CD will identify any issues that need follow-up work.
+    </rationale>
+  </scope_boundaries>
+
+  <error_handling>
+    <error type="concert_api_unavailable">
+      <detection>Concert API returns 5xx errors or times out</detection>
+      <handling>
+        <step>Document the Concert API issue</step>
+        <step>Proceed with manual CVE research using public databases</step>
+        <step>Note in PR that Concert was unavailable</step>
+      </handling>
+    </error>
+
+    <error type="github_mcp_failure">
+      <detection>GitHub MCP tools fail or return errors</detection>
+      <handling>
+        <step>Provide manual git commands as fallback</step>
+        <step>Document the steps user needs to take manually</step>
+      </handling>
+    </error>
+
+    <error type="breaking_changes_suspected">
+      <detection>Package upgrade version indicates potential breaking changes</detection>
+      <handling>
+        <step>Document the potential breaking changes in PR description</step>
+        <step>Note that CI/CD will validate compatibility</step>
+        <step>Proceed with the upgrade as recommended by Concert</step>
+        <step>Do NOT attempt to fix code issues preemptively</step>
+      </handling>
+    </error>
+  </error_handling>
+
+  <validation_checklist>
+    <before_starting>
+      <item>Confirmed GitHub issue is assigned to user</item>
+      <item>Extracted CVE ID and package name</item>
+      <item>Loaded Concert credentials from .env</item>
+    </before_starting>
+
+    <before_committing>
+      <item>Verified Concert recommendation applied correctly</item>
+      <item>Added explanatory comments to manifest</item>
+      <item>Checked no application code was modified</item>
+      <item>Checked no test files were modified</item>
+      <item>Confirmed commit message follows format</item>
+    </before_committing>
+
+    <before_pr_creation>
+      <item>Branch name follows convention</item>
+      <item>All manifest changes committed</item>
+      <item>PR description includes CVE details</item>
+      <item>PR links to original issue</item>
+      <item>Appropriate labels added</item>
+      <item>PR notes that CI/CD will validate changes</item>
+    </before_pr_creation>
+  </validation_checklist>
+</cve_remediation_workflow>
+
+<!-- Made with Bob -->

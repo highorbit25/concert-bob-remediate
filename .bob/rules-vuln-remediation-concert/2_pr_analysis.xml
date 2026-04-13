@@ -1,0 +1,566 @@
+<pr_analysis_patterns>
+  <overview>
+    Comprehensive patterns and techniques for analyzing pull requests that contain
+    vulnerability fixes, understanding the security context, and identifying potential
+    breaking changes that may cause test failures.
+  </overview>
+
+  <pr_information_extraction>
+    <title>Extracting Key Information from PRs</title>
+    
+    <essential_information>
+      <item name="cve_identification">
+        <description>Identify the CVE being addressed</description>
+        <sources>
+          <source>PR title (often contains CVE-YYYY-XXXXX)</source>
+          <source>PR description body</source>
+          <source>Commit messages</source>
+          <source>Linked issues</source>
+          <source>File changes (comments in dependency files)</source>
+        </sources>
+        <extraction_patterns>
+          <pattern>CVE-\d{4}-\d{4,7}</pattern>
+          <pattern>Security fix for [package name]</pattern>
+          <pattern>Upgrade [package] to fix vulnerability</pattern>
+        </extraction_patterns>
+      </item>
+      
+      <item name="package_changes">
+        <description>Identify which packages are being upgraded</description>
+        <file_patterns>
+          <python>requirements.txt, setup.py, pyproject.toml, Pipfile</python>
+          <nodejs>package.json, package-lock.json, yarn.lock</nodejs>
+          <java>pom.xml, build.gradle, gradle.properties</java>
+          <ruby>Gemfile, Gemfile.lock</ruby>
+          <go>go.mod, go.sum</go>
+        </file_patterns>
+        <what_to_extract>
+          <item>Package name</item>
+          <item>Old version number</item>
+          <item>New version number</item>
+          <item>Whether it's a direct or transitive dependency</item>
+        </what_to_extract>
+      </item>
+      
+      <item name="version_jump_analysis">
+        <description>Assess the magnitude of the version change</description>
+        <risk_levels>
+          <major_version>
+            <pattern>1.x.x → 2.x.x</pattern>
+            <risk>HIGH - Likely breaking changes</risk>
+            <action>Expect significant API changes, review migration guide</action>
+          </major_version>
+          <minor_version>
+            <pattern>1.2.x → 1.3.x</pattern>
+            <risk>MEDIUM - Possible breaking changes</risk>
+            <action>Check for deprecations and new features</action>
+          </minor_version>
+          <patch_version>
+            <pattern>1.2.3 → 1.2.4</pattern>
+            <risk>LOW - Usually backward compatible</risk>
+            <action>Review bug fixes, minimal changes expected</action>
+          </patch_version>
+        </risk_levels>
+      </item>
+      
+      <item name="test_failure_indicators">
+        <description>Identify signs of test failures in PR</description>
+        <indicators>
+          <indicator>CI/CD status checks showing failures</indicator>
+          <indicator>Comments mentioning failing tests</indicator>
+          <indicator>PR marked as "draft" or "WIP"</indicator>
+          <indicator>Labels like "needs-work" or "failing-tests"</indicator>
+          <indicator>Reviewer comments about test issues</indicator>
+        </indicators>
+      </item>
+    </essential_information>
+  </pr_information_extraction>
+
+  <dependency_analysis>
+    <title>Understanding Dependency Changes</title>
+    
+    <direct_vs_transitive>
+      <direct_dependency>
+        <definition>
+          Package explicitly listed in your dependency file that you directly import/use
+        </definition>
+        <identification>
+          - Listed in requirements.txt, package.json, etc.
+          - Your code has import statements for this package
+          - You call functions/classes from this package
+        </identification>
+        <remediation_approach>
+          - Update the version in dependency file
+          - Fix any breaking changes in your code
+          - Update imports if package structure changed
+        </remediation_approach>
+      </direct_dependency>
+      
+      <transitive_dependency>
+        <definition>
+          Package required by one of your direct dependencies, not used directly by your code
+        </definition>
+        <identification>
+          - Not listed in your main dependency file
+          - Appears in lock files (package-lock.json, Pipfile.lock)
+          - Your code doesn't import it directly
+        </identification>
+        <remediation_approach>
+          - Upgrade the direct dependency that requires it
+          - Use dependency overrides/resolutions if needed
+          - Verify compatibility with direct dependency
+        </remediation_approach>
+      </transitive_dependency>
+    </direct_vs_transitive>
+    
+    <dependency_tree_analysis>
+      <purpose>
+        Understand the full impact of a package upgrade on the dependency tree
+      </purpose>
+      <commands>
+        <python>
+          <command>pip show [package]</command>
+          <command>pip list --outdated</command>
+          <command>pipdeptree</command>
+        </python>
+        <nodejs>
+          <command>npm list [package]</command>
+          <command>npm outdated</command>
+          <command>npm ls --depth=0</command>
+        </nodejs>
+        <java>
+          <command>mvn dependency:tree</command>
+          <command>gradle dependencies</command>
+        </java>
+      </commands>
+      <what_to_look_for>
+        <item>Which packages depend on the upgraded package</item>
+        <item>Version constraints that might conflict</item>
+        <item>Other packages that might need upgrading</item>
+        <item>Circular dependencies</item>
+      </what_to_look_for>
+    </dependency_tree_analysis>
+  </dependency_analysis>
+
+  <breaking_change_research>
+    <title>Researching Breaking Changes</title>
+    
+    <information_sources>
+      <source priority="1">
+        <name>Official Migration Guide</name>
+        <description>
+          Most packages provide migration guides for major version upgrades
+        </description>
+        <locations>
+          <location>Package documentation website</location>
+          <location>MIGRATION.md or UPGRADING.md in repository</location>
+          <location>Release notes for the new version</location>
+        </locations>
+      </source>
+      
+      <source priority="2">
+        <name>CHANGELOG</name>
+        <description>
+          Detailed list of changes between versions
+        </description>
+        <what_to_look_for>
+          <item>Sections marked "BREAKING CHANGES"</item>
+          <item>Removed or deprecated features</item>
+          <item>Changed function signatures</item>
+          <item>Renamed modules or classes</item>
+        </what_to_look_for>
+      </source>
+      
+      <source priority="3">
+        <name>Release Notes</name>
+        <description>
+          High-level overview of changes in each release
+        </description>
+        <locations>
+          <location>GitHub Releases page</location>
+          <location>Package registry (PyPI, npm, Maven Central)</location>
+          <location>Official blog or website</location>
+        </locations>
+      </source>
+      
+      <source priority="4">
+        <name>API Documentation</name>
+        <description>
+          Compare old vs new API documentation
+        </description>
+        <approach>
+          - Look at docs for old version
+          - Compare with docs for new version
+          - Note any missing or changed APIs
+        </approach>
+      </source>
+      
+      <source priority="5">
+        <name>Community Resources</name>
+        <description>
+          Learn from others who have upgraded
+        </description>
+        <resources>
+          <resource>Stack Overflow questions about the upgrade</resource>
+          <resource>GitHub issues in the package repository</resource>
+          <resource>Blog posts about migration experiences</resource>
+          <resource>Package maintainer's Twitter/social media</resource>
+        </resources>
+      </source>
+    </information_sources>
+    
+    <common_breaking_changes>
+      <category name="api_changes">
+        <change type="function_signature">
+          <description>Function parameters added, removed, or reordered</description>
+          <example>
+            Old: function(arg1, arg2)
+            New: function(arg1, arg2, required_arg3)
+          </example>
+          <detection>
+            TypeError: function() takes X arguments but Y were given
+          </detection>
+        </change>
+        
+        <change type="return_type">
+          <description>Function return type or structure changed</description>
+          <example>
+            Old: returns dict
+            New: returns custom object
+          </example>
+          <detection>
+            AttributeError: 'dict' object has no attribute 'method'
+          </detection>
+        </change>
+        
+        <change type="removed_function">
+          <description>Function or method removed entirely</description>
+          <example>
+            Old: package.old_function()
+            New: function no longer exists
+          </example>
+          <detection>
+            AttributeError: module 'package' has no attribute 'old_function'
+          </detection>
+        </change>
+      </category>
+      
+      <category name="import_changes">
+        <change type="module_restructure">
+          <description>Package internal structure reorganized</description>
+          <example>
+            Old: from package import function
+            New: from package.submodule import function
+          </example>
+          <detection>
+            ImportError: cannot import name 'function' from 'package'
+          </detection>
+        </change>
+        
+        <change type="renamed_module">
+          <description>Module or subpackage renamed</description>
+          <example>
+            Old: from package.old_name import Class
+            New: from package.new_name import Class
+          </example>
+          <detection>
+            ModuleNotFoundError: No module named 'package.old_name'
+          </detection>
+        </change>
+      </category>
+      
+      <category name="behavior_changes">
+        <change type="default_values">
+          <description>Default parameter values changed</description>
+          <example>
+            Old: function(strict=False)
+            New: function(strict=True)
+          </example>
+          <detection>
+            Tests fail due to different behavior with same code
+          </detection>
+        </change>
+        
+        <change type="validation">
+          <description>Stricter input validation added</description>
+          <example>
+            Old: accepts any string
+            New: validates string format
+          </example>
+          <detection>
+            ValueError: invalid input format
+          </detection>
+        </change>
+        
+        <change type="error_handling">
+          <description>Different exceptions raised</description>
+          <example>
+            Old: raises ValueError
+            New: raises CustomException
+          </example>
+          <detection>
+            Uncaught exception in tests
+          </detection>
+        </change>
+      </category>
+      
+      <category name="configuration_changes">
+        <change type="config_format">
+          <description>Configuration file format or structure changed</description>
+          <example>
+            Old: JSON config
+            New: YAML config required
+          </example>
+          <detection>
+            Configuration errors at startup
+          </detection>
+        </change>
+        
+        <change type="required_settings">
+          <description>New required configuration options</description>
+          <example>
+            Old: optional setting
+            New: required setting
+          </example>
+          <detection>
+            ConfigurationError: missing required setting
+          </detection>
+        </change>
+      </category>
+    </common_breaking_changes>
+  </breaking_change_research>
+
+  <pr_diff_analysis>
+    <title>Analyzing PR Diff for Clues</title>
+    
+    <what_to_look_for>
+      <item name="dependency_file_changes">
+        <description>Changes in package manifest files</description>
+        <analysis>
+          - Note exact version changes
+          - Check for multiple package upgrades
+          - Look for comments explaining changes
+          - Identify if it's a minimal or comprehensive upgrade
+        </analysis>
+      </item>
+      
+      <item name="code_changes">
+        <description>Any code changes accompanying the upgrade</description>
+        <significance>
+          If DevOps engineer already made code changes, these indicate
+          known breaking changes they've addressed. Your job is to fix
+          the remaining issues causing test failures.
+        </significance>
+      </item>
+      
+      <item name="test_changes">
+        <description>Changes to test files</description>
+        <analysis>
+          - Updated test expectations
+          - New test setup requirements
+          - Changed mock configurations
+          - These show what the engineer knows needs updating
+        </analysis>
+      </item>
+      
+      <item name="documentation_updates">
+        <description>README or doc changes</description>
+        <value>
+          May contain notes about the upgrade, known issues,
+          or migration steps
+        </value>
+      </item>
+    </what_to_look_for>
+    
+    <diff_reading_strategy>
+      <step number="1">
+        <action>Start with dependency files</action>
+        <details>
+          Understand what packages changed and by how much
+        </details>
+      </step>
+      
+      <step number="2">
+        <action>Review any code changes</action>
+        <details>
+          See what the DevOps engineer already fixed
+        </details>
+      </step>
+      
+      <step number="3">
+        <action>Check test file changes</action>
+        <details>
+          Understand what test updates were attempted
+        </details>
+      </step>
+      
+      <step number="4">
+        <action>Look for comments in the diff</action>
+        <details>
+          Engineers often leave helpful comments explaining changes
+        </details>
+      </step>
+    </diff_reading_strategy>
+  </pr_diff_analysis>
+
+  <security_context_understanding>
+    <title>Understanding the Security Fix</title>
+    
+    <cve_research>
+      <purpose>
+        Understand what vulnerability is being fixed to ensure your
+        remediation doesn't compromise the security fix
+      </purpose>
+      
+      <research_steps>
+        <step number="1">
+          <action>Look up CVE details</action>
+          <sources>
+            <source>NVD (National Vulnerability Database)</source>
+            <source>CVE.org</source>
+            <source>Package security advisories</source>
+            <source>GitHub Security Advisories</source>
+          </sources>
+        </step>
+        
+        <step number="2">
+          <action>Understand the vulnerability type</action>
+          <common_types>
+            <type>Remote Code Execution (RCE)</type>
+            <type>SQL Injection</type>
+            <type>Cross-Site Scripting (XSS)</type>
+            <type>Denial of Service (DoS)</type>
+            <type>Authentication Bypass</type>
+            <type>Information Disclosure</type>
+          </common_types>
+        </step>
+        
+        <step number="3">
+          <action>Identify affected functionality</action>
+          <questions>
+            <question>Which functions or features are vulnerable?</question>
+            <question>What conditions trigger the vulnerability?</question>
+            <question>How does the upgrade fix it?</question>
+          </questions>
+        </step>
+        
+        <step number="4">
+          <action>Verify the fix</action>
+          <verification>
+            - Confirm the new version addresses the CVE
+            - Check if there are any workarounds mentioned
+            - Ensure no code changes reintroduce the vulnerability
+          </verification>
+        </step>
+      </research_steps>
+    </cve_research>
+    
+    <security_constraints>
+      <constraint name="no_version_downgrade">
+        <rule>Never downgrade to a vulnerable version</rule>
+        <rationale>
+          Even if tests pass with an older version, security takes priority
+        </rationale>
+      </constraint>
+      
+      <constraint name="no_workarounds_that_expose">
+        <rule>Don't implement workarounds that bypass security fixes</rule>
+        <example>
+          Bad: Disabling input validation to make tests pass
+          Good: Updating test inputs to match new validation
+        </example>
+      </constraint>
+      
+      <constraint name="maintain_security_features">
+        <rule>Keep any new security features enabled</rule>
+        <example>
+          If upgrade adds CSRF protection, don't disable it to fix tests
+        </example>
+      </constraint>
+    </security_constraints>
+  </security_context_understanding>
+
+  <pr_analysis_checklist>
+    <title>Complete PR Analysis Checklist</title>
+    
+    <checklist>
+      <section name="basic_information">
+        <item>✓ PR number and title identified</item>
+        <item>✓ CVE ID extracted</item>
+        <item>✓ Package name and versions noted</item>
+        <item>✓ PR author and creation date recorded</item>
+      </section>
+      
+      <section name="technical_analysis">
+        <item>✓ Dependency file changes reviewed</item>
+        <item>✓ Version jump magnitude assessed</item>
+        <item>✓ Direct vs transitive dependency identified</item>
+        <item>✓ Breaking changes researched</item>
+        <item>✓ Migration guide reviewed (if available)</item>
+      </section>
+      
+      <section name="test_status">
+        <item>✓ CI/CD status checked</item>
+        <item>✓ Failing tests identified</item>
+        <item>✓ Test failure patterns noted</item>
+        <item>✓ Error messages captured</item>
+      </section>
+      
+      <section name="security_context">
+        <item>✓ CVE details researched</item>
+        <item>✓ Vulnerability type understood</item>
+        <item>✓ Security fix verified</item>
+        <item>✓ Security constraints noted</item>
+      </section>
+      
+      <section name="code_context">
+        <item>✓ Existing code changes reviewed</item>
+        <item>✓ Package usage in codebase identified</item>
+        <item>✓ Potential impact areas noted</item>
+        <item>✓ Test file changes examined</item>
+      </section>
+    </checklist>
+  </pr_analysis_checklist>
+
+  <analysis_output_template>
+    <title>PR Analysis Summary Template</title>
+    
+    <template>
+      ## PR Analysis Summary
+      
+      ### Basic Information
+      - **PR**: #{number} - {title}
+      - **CVE**: {cve_id}
+      - **Package**: {package_name}
+      - **Version Change**: {old_version} → {new_version}
+      - **Change Type**: {major/minor/patch}
+      
+      ### Security Context
+      - **Vulnerability Type**: {type}
+      - **Severity**: {severity}
+      - **Affected Functionality**: {description}
+      - **Fix Verification**: {verified/not_verified}
+      
+      ### Breaking Changes Identified
+      1. {breaking_change_1}
+      2. {breaking_change_2}
+      3. {breaking_change_3}
+      
+      ### Test Failures
+      - **Total Failing**: {count}
+      - **Failure Patterns**:
+        - {pattern_1}: {count} tests
+        - {pattern_2}: {count} tests
+      
+      ### Impact Assessment
+      - **Files Likely Affected**: {count}
+      - **Estimated Complexity**: {low/medium/high}
+      - **Risk Level**: {low/medium/high}
+      
+      ### Next Steps
+      1. {step_1}
+      2. {step_2}
+      3. {step_3}
+    </template>
+  </analysis_output_template>
+</pr_analysis_patterns>

@@ -1,0 +1,722 @@
+<github_integration>
+  <overview>
+    Guidelines for using GitHub MCP to interact with pull requests, fetch PR details,
+    and manage the vulnerability remediation workflow through GitHub.
+  </overview>
+
+  <github_mcp_capabilities>
+    <title>Available GitHub MCP Operations</title>
+    
+    <capability name="fetch_assigned_prs">
+      <description>
+        Retrieve pull requests assigned to the user
+      </description>
+      <use_cases>
+        <use_case>List all PRs where user is assigned as reviewer</use_case>
+        <use_case>Find vulnerability remediation PRs</use_case>
+        <use_case>Check PR status and CI results</use_case>
+      </use_cases>
+      <typical_workflow>
+        User asks: "What are the GitHub PRs assigned to me?"
+        You use GitHub MCP to fetch and display the list
+      </typical_workflow>
+    </capability>
+    
+    <capability name="fetch_pr_details">
+      <description>
+        Get detailed information about a specific pull request
+      </description>
+      <information_retrieved>
+        <item>PR title and description</item>
+        <item>Author and creation date</item>
+        <item>Changed files and diffs</item>
+        <item>Comments and review feedback</item>
+        <item>CI/CD status checks</item>
+        <item>Linked issues</item>
+        <item>Labels and milestones</item>
+      </information_retrieved>
+    </capability>
+    
+    <capability name="read_pr_diff">
+      <description>
+        Access the code changes in the pull request
+      </description>
+      <what_to_analyze>
+        <item>Dependency file changes (requirements.txt, package.json, etc.)</item>
+        <item>Code modifications made by DevOps engineer</item>
+        <item>Test file updates</item>
+        <item>Configuration changes</item>
+        <item>Documentation updates</item>
+      </what_to_analyze>
+    </capability>
+    
+    <capability name="fetch_linked_issues">
+      <description>
+        Retrieve issues linked to the PR
+      </description>
+      <value>
+        Issues often contain:
+        - CVE details and context
+        - Security advisory information
+        - Discussion about the vulnerability
+        - Remediation requirements
+      </value>
+    </capability>
+  </github_mcp_capabilities>
+
+  <pr_discovery_workflow>
+    <title>Discovering and Selecting PRs</title>
+    
+    <scenario name="user_asks_for_assigned_prs">
+      <user_query>What are the GitHub PRs assigned to me?</user_query>
+      
+      <response_steps>
+        <step number="1">
+          <action>Use GitHub MCP to fetch assigned PRs</action>
+          <tool>fetch_github_issue or equivalent MCP tool</tool>
+        </step>
+        
+        <step number="2">
+          <action>Filter for relevant PRs</action>
+          <criteria>
+            - PRs with failing tests
+            - PRs related to security/CVE fixes
+            - PRs where you're assigned as reviewer
+            - Open PRs (not merged or closed)
+          </criteria>
+        </step>
+        
+        <step number="3">
+          <action>Present PRs in clear format</action>
+          <format>
+            ## Pull Requests Assigned to You
+            
+            ### PR #123: Upgrade Flask to fix CVE-2023-12345
+            - **Status**: ❌ Tests Failing
+            - **Author**: devops-engineer
+            - **Created**: 2 days ago
+            - **Changes**: requirements.txt (Flask 2.0.1 → 2.3.3)
+            - **Failing Tests**: 5 tests in test_app.py
+            
+            ### PR #124: Update dependencies for security
+            - **Status**: ✅ Tests Passing
+            - **Author**: security-team
+            - **Created**: 1 week ago
+            - **Changes**: Multiple package upgrades
+          </format>
+        </step>
+        
+        <step number="4">
+          <action>Ask user which PR to work on</action>
+          <use_tool>ask_followup_question</use_tool>
+          <suggestions>
+            <suggest>Review PR #123 and fix failing tests</suggest>
+            <suggest>Show me details of PR #123</suggest>
+            <suggest>List all failing tests in PR #123</suggest>
+          </suggestions>
+        </step>
+      </response_steps>
+    </scenario>
+    
+    <scenario name="user_provides_pr_number">
+      <user_query>Review PR #123 and fix the failing unit tests</user_query>
+      
+      <response_steps>
+        <step number="1">
+          <action>Extract PR number from user message</action>
+          <pattern>PR #(\d+)</pattern>
+        </step>
+        
+        <step number="2">
+          <action>Fetch PR details via GitHub MCP</action>
+          <details_to_extract>
+            - PR title and description
+            - Changed files
+            - Diff content
+            - CI status
+            - Comments
+          </details_to_extract>
+        </step>
+        
+        <step number="3">
+          <action>Proceed with PR analysis workflow</action>
+          <reference>See 2_pr_analysis.xml for detailed steps</reference>
+        </step>
+      </response_steps>
+    </scenario>
+    
+    <scenario name="user_provides_pr_url">
+      <user_query>Review https://github.com/org/repo/pull/123</user_query>
+      
+      <response_steps>
+        <step number="1">
+          <action>Parse GitHub URL</action>
+          <pattern>https://github\.com/([^/]+)/([^/]+)/pull/(\d+)</pattern>
+          <extract>
+            - Organization/owner
+            - Repository name
+            - PR number
+          </extract>
+        </step>
+        
+        <step number="2">
+          <action>Use GitHub MCP with full URL</action>
+          <tool>fetch_github_issue with issue_url parameter</tool>
+        </step>
+        
+        <step number="3">
+          <action>Continue with standard PR analysis</action>
+        </step>
+      </response_steps>
+    </scenario>
+  </pr_discovery_workflow>
+
+  <pr_information_extraction>
+    <title>Extracting Key Information from PRs</title>
+    
+    <extraction_checklist>
+      <section name="basic_info">
+        <item>PR number</item>
+        <item>PR title</item>
+        <item>Author</item>
+        <item>Creation date</item>
+        <item>Current status (open/closed/merged)</item>
+      </section>
+      
+      <section name="security_context">
+        <item>CVE ID (from title, description, or linked issues)</item>
+        <item>Vulnerability description</item>
+        <item>Severity level</item>
+        <item>Affected package(s)</item>
+      </section>
+      
+      <section name="technical_details">
+        <item>Changed files list</item>
+        <item>Package version changes</item>
+        <item>Code modifications</item>
+        <item>Test file changes</item>
+      </section>
+      
+      <section name="test_status">
+        <item>CI/CD check results</item>
+        <item>Number of failing tests</item>
+        <item>Test failure messages (if available)</item>
+        <item>Build status</item>
+      </section>
+      
+      <section name="context">
+        <item>PR description/body</item>
+        <item>Comments from reviewers</item>
+        <item>Linked issues</item>
+        <item>Related PRs</item>
+      </section>
+    </extraction_checklist>
+    
+    <parsing_pr_description>
+      <common_patterns>
+        <pattern name="cve_reference">
+          <regex>CVE-\d{4}-\d{4,7}</regex>
+          <example>Fixes CVE-2023-12345</example>
+        </pattern>
+        
+        <pattern name="package_upgrade">
+          <regex>Upgrade (\w+) from ([\d.]+) to ([\d.]+)</regex>
+          <example>Upgrade Flask from 2.0.1 to 2.3.3</example>
+        </pattern>
+        
+        <pattern name="issue_reference">
+          <regex>#\d+|Fixes #\d+|Closes #\d+</regex>
+          <example>Fixes #456</example>
+        </pattern>
+        
+        <pattern name="breaking_changes">
+          <keywords>
+            - "Breaking changes"
+            - "BREAKING"
+            - "Migration required"
+            - "API changes"
+          </keywords>
+        </pattern>
+      </common_patterns>
+    </parsing_pr_description>
+  </pr_information_extraction>
+
+  <pr_diff_analysis>
+    <title>Analyzing PR Diffs</title>
+    
+    <diff_reading_strategy>
+      <step number="1">
+        <action>Identify changed files</action>
+        <categorize>
+          - Dependency files (requirements.txt, package.json, etc.)
+          - Application code
+          - Test files
+          - Configuration files
+          - Documentation
+        </categorize>
+      </step>
+      
+      <step number="2">
+        <action>Focus on dependency changes first</action>
+        <extract>
+          - Which packages changed
+          - Old versions
+          - New versions
+          - Direct vs transitive dependencies
+        </extract>
+      </step>
+      
+      <step number="3">
+        <action>Review code changes</action>
+        <understand>
+          - What the DevOps engineer already fixed
+          - What patterns they used
+          - What might still need fixing
+        </understand>
+      </step>
+      
+      <step number="4">
+        <action>Check test file modifications</action>
+        <analyze>
+          - Test setup changes
+          - Mock updates
+          - Assertion changes
+          - New test requirements
+        </analyze>
+      </step>
+    </diff_reading_strategy>
+    
+    <diff_interpretation>
+      <green_lines>
+        <meaning>Added lines (new code)</meaning>
+        <significance>
+          - New imports
+          - New function calls
+          - New configuration
+          - Additions made by DevOps engineer
+        </significance>
+      </green_lines>
+      
+      <red_lines>
+        <meaning>Removed lines (deleted code)</meaning>
+        <significance>
+          - Old imports removed
+          - Deprecated code removed
+          - Old configuration removed
+          - What the DevOps engineer thought needed changing
+        </significance>
+      </red_lines>
+      
+      <context_lines>
+        <meaning>Unchanged lines shown for context</meaning>
+        <use>
+          Understand the surrounding code and how changes fit in
+        </use>
+      </context_lines>
+    </diff_interpretation>
+  </pr_diff_analysis>
+
+  <ci_status_interpretation>
+    <title>Understanding CI/CD Check Results</title>
+    
+    <status_types>
+      <status name="failing_tests">
+        <indicator>❌ Tests Failed</indicator>
+        <meaning>Unit tests are not passing</meaning>
+        <action>This is what you need to fix</action>
+      </status>
+      
+      <status name="build_failure">
+        <indicator>❌ Build Failed</indicator>
+        <meaning>Code doesn't compile or dependencies can't be installed</meaning>
+        <action>May need to fix build issues before tests</action>
+      </status>
+      
+      <status name="linting_errors">
+        <indicator>❌ Lint Failed</indicator>
+        <meaning>Code style or quality issues</meaning>
+        <action>May need to address after fixing tests</action>
+      </status>
+      
+      <status name="pending">
+        <indicator>⏳ Pending</indicator>
+        <meaning>Checks haven't completed yet</meaning>
+        <action>Wait for results or check locally</action>
+      </status>
+      
+      <status name="passing">
+        <indicator>✅ Passed</indicator>
+        <meaning>This check is successful</meaning>
+        <action>No action needed for this check</action>
+      </status>
+    </status_types>
+    
+    <interpreting_test_results>
+      <information_available>
+        <item>Total number of tests run</item>
+        <item>Number of tests passed</item>
+        <item>Number of tests failed</item>
+        <item>Test execution time</item>
+        <item>Sometimes: specific failing test names</item>
+      </information_available>
+      
+      <what_to_look_for>
+        <item>How many tests are failing</item>
+        <item>Are failures in specific test files</item>
+        <item>Did tests pass before the PR</item>
+        <item>Are there any error messages visible</item>
+      </what_to_look_for>
+    </interpreting_test_results>
+  </ci_status_interpretation>
+
+  <pr_comments_analysis>
+    <title>Learning from PR Comments</title>
+    
+    <valuable_comments>
+      <type name="devops_notes">
+        <description>
+          DevOps engineer explaining what they tried or what's known
+        </description>
+        <example>
+          "I upgraded Flask but the tests are failing due to API changes.
+          Need help fixing the application code."
+        </example>
+        <value>
+          Tells you what's already been attempted and what's needed
+        </value>
+      </type>
+      
+      <type name="reviewer_feedback">
+        <description>
+          Other reviewers pointing out issues or suggestions
+        </description>
+        <example>
+          "The import statements need updating for the new Flask version"
+        </example>
+        <value>
+          May provide hints about what needs fixing
+        </value>
+      </type>
+      
+      <type name="bot_comments">
+        <description>
+          Automated comments from CI/CD or security bots
+        </description>
+        <example>
+          "Security vulnerability CVE-2023-12345 will be fixed by this upgrade"
+        </example>
+        <value>
+          Confirms the security context and purpose
+        </value>
+      </type>
+    </valuable_comments>
+  </pr_comments_analysis>
+
+  <linked_issues_analysis>
+    <title>Analyzing Linked Issues</title>
+    
+    <why_check_issues>
+      <reason>Issues often contain more context than the PR</reason>
+      <reason>May include CVE details and security advisories</reason>
+      <reason>Could have discussion about remediation approach</reason>
+      <reason>Might list known breaking changes</reason>
+    </why_check_issues>
+    
+    <what_to_extract>
+      <item>CVE description and severity</item>
+      <item>Affected functionality</item>
+      <item>Recommended remediation steps</item>
+      <item>Known breaking changes</item>
+      <item>Timeline or urgency</item>
+      <item>Related vulnerabilities</item>
+    </what_to_extract>
+    
+    <issue_patterns>
+      <pattern name="security_advisory">
+        <title_pattern>Security: CVE-YYYY-XXXXX in [package]</title_pattern>
+        <contains>
+          - CVE details
+          - Vulnerability description
+          - Affected versions
+          - Fixed versions
+          - Workarounds if any
+        </contains>
+      </pattern>
+      
+      <pattern name="upgrade_tracking">
+        <title_pattern>Upgrade [package] to [version]</title_pattern>
+        <contains>
+          - Reason for upgrade
+          - Expected changes
+          - Migration notes
+          - Testing requirements
+        </contains>
+      </pattern>
+    </issue_patterns>
+  </linked_issues_analysis>
+
+  <pr_update_workflow>
+    <title>Updating PR After Fixes</title>
+    
+    <critical_principle>
+      <rule>ALWAYS commit changes to the EXISTING PR branch, NEVER create a new branch</rule>
+      <rationale>
+        The PR already exists with a specific branch. Committing to that branch will:
+        - Trigger the CI/CD workflow automatically
+        - Update the PR with your fixes
+        - Allow the workflow to re-run tests and assign reviewers
+      </rationale>
+      <never>Never create a new branch like "pr-38" or "fix-tests"</never>
+      <always>Always use the branch name from the PR metadata (e.g., "fix/cve-2023-12345-flask")</always>
+    </critical_principle>
+    
+    <preparation>
+      <step number="0">
+        <action>Identify the PR's source branch</action>
+        <how>
+          From the PR metadata fetched via GitHub MCP, extract:
+          - head.ref (the branch name)
+          - head.repo (the repository, usually same as base)
+        </how>
+        <example>
+          If PR shows: "highorbit25 wants to merge 1 commit into main from fix/cve-2023-12345-flask"
+          Then the branch is: fix/cve-2023-12345-flask
+        </example>
+        <critical>This is the branch you MUST commit to</critical>
+      </step>
+      
+      <step number="1">
+        <action>Verify all tests pass locally</action>
+        <command>Run full test suite</command>
+      </step>
+      
+      <step number="2">
+        <action>Review all changes made</action>
+        <tool>obtain_git_diff</tool>
+      </step>
+      
+      <step number="3">
+        <action>Prepare commit message</action>
+        <format>
+          fix: resolve unit test failures after [package] upgrade
+          
+          - Fixed import paths for [package] v[version]
+          - Updated API calls to match new signatures
+          - Replaced deprecated methods with recommended alternatives
+          
+          Addresses failing tests in PR #[number]
+          Related to CVE-[id]
+        </format>
+      </step>
+    </preparation>
+    
+    <commit_and_push>
+      <step number="1">
+        <action>Ensure you're on the correct branch</action>
+        <command>git checkout [pr-branch-name]</command>
+        <example>git checkout fix/cve-2023-12345-flask</example>
+        <verify>git branch --show-current</verify>
+        <critical>
+          Use the EXACT branch name from the PR, not a new branch name.
+          This ensures your commit updates the existing PR.
+        </critical>
+      </step>
+      
+      <step number="2">
+        <action>Stage changes</action>
+        <command>git add [files]</command>
+        <example>git add app/vulnerable/main.py app/vulnerable/test_main.py</example>
+      </step>
+      
+      <step number="3">
+        <action>Commit with clear message</action>
+        <command>git commit -m "message"</command>
+        <example>
+          git commit -m "fix: resolve unit test failures after Flask upgrade
+
+- Fixed import paths for Flask v3.1.0
+- Updated test assertions to match new behavior
+
+Addresses failing tests in PR #38
+Related to CVE-2024-12345"
+        </example>
+      </step>
+      
+      <step number="4">
+        <action>Push to the PR branch</action>
+        <command>git push origin [pr-branch-name]</command>
+        <example>git push origin fix/cve-2023-12345-flask</example>
+        <result>
+          This will:
+          - Update the PR with your commit
+          - Trigger the CI/CD workflow (.github/workflows/pr-unit-test.yml)
+          - Re-run the unit tests
+          - Automatically assign reviewers based on test results
+        </result>
+        <critical>
+          The branch name MUST match the PR's head branch exactly.
+          Do NOT push to a different branch or create a new PR.
+        </critical>
+      </step>
+    </commit_and_push>
+    
+    <pr_comment>
+      <when>After pushing fixes to the PR branch</when>
+      <purpose>Document what was fixed and why for the PR reviewers</purpose>
+      <how>Use GitHub MCP to add a comment to the PR</how>
+      <tool>use_mcp_tool with github server and add_issue_comment tool</tool>
+      
+      <step_by_step>
+        <step number="1">
+          <action>Prepare the comment content</action>
+          <use_template>See template below</use_template>
+        </step>
+        
+        <step number="2">
+          <action>Add comment to PR using GitHub MCP</action>
+          <tool>use_mcp_tool</tool>
+          <parameters>
+            <server_name>github</server_name>
+            <tool_name>add_issue_comment</tool_name>
+            <arguments>
+              {
+                "owner": "[repo-owner]",
+                "repo": "[repo-name]",
+                "issue_number": [pr-number],
+                "body": "[comment-content]"
+              }
+            </arguments>
+          </parameters>
+          <example>
+            <use_mcp_tool>
+              <server_name>github</server_name>
+              <tool_name>add_issue_comment</tool_name>
+              <arguments>
+                {
+                  "owner": "your-org",
+                  "repo": "your-repo",
+                  "issue_number": 38,
+                  "body": "## Unit Test Fixes\n\nI've fixed the failing unit tests..."
+                }
+              </arguments>
+            </use_mcp_tool>
+          </example>
+        </step>
+      </step_by_step>
+      
+      <template>
+        ## Unit Test Fixes
+        
+        I've fixed the failing unit tests caused by the [package] upgrade.
+        
+        ### Changes Made
+        - Updated import statements in [files]
+        - Modified API calls to match new [package] v[version] signatures
+        - Replaced deprecated `old_method()` with `new_method()`
+        
+        ### Root Cause
+        The upgrade from v[old] to v[new] introduced these breaking changes:
+        - [Breaking change 1]
+        - [Breaking change 2]
+        
+        ### Testing
+        - All [N] unit tests now pass ✅
+        - No regressions introduced
+        - Security fix verified and maintained
+        
+        ### Files Modified
+        - `[file1]`: [reason]
+        - `[file2]`: [reason]
+        
+        Ready for review!
+      </template>
+      
+      <why_this_matters>
+        <reason>Documents the remediation work for reviewers</reason>
+        <reason>Explains the root cause of test failures</reason>
+        <reason>Shows what was changed and why</reason>
+        <reason>Confirms all tests now pass</reason>
+        <reason>Provides context for the Software Lead review</reason>
+      </why_this_matters>
+    </pr_comment>
+  </pr_update_workflow>
+
+  <best_practices>
+    <title>GitHub Integration Best Practices</title>
+    
+    <practice name="clear_communication">
+      <principle>Communicate clearly with PR author and reviewers</principle>
+      <guidelines>
+        <guideline>Explain what you fixed and why</guideline>
+        <guideline>Reference documentation or migration guides</guideline>
+        <guideline>Note any decisions or trade-offs made</guideline>
+        <guideline>Ask questions if anything is unclear</guideline>
+      </guidelines>
+    </practice>
+    
+    <practice name="respect_pr_scope">
+      <principle>Stay within the scope of the PR</principle>
+      <guidelines>
+        <guideline>Fix only test failures related to the upgrade</guideline>
+        <guideline>Don't add unrelated features or refactoring</guideline>
+        <guideline>Don't change the security fix itself</guideline>
+        <guideline>Keep changes minimal and focused</guideline>
+      </guidelines>
+    </practice>
+    
+    <practice name="document_decisions">
+      <principle>Document why you made specific choices</principle>
+      <guidelines>
+        <guideline>Explain non-obvious fixes in code comments</guideline>
+        <guideline>Link to relevant documentation</guideline>
+        <guideline>Note any alternative approaches considered</guideline>
+        <guideline>Highlight any potential concerns</guideline>
+      </guidelines>
+    </practice>
+    
+    <practice name="verify_before_pushing">
+      <principle>Always verify locally before pushing</principle>
+      <checklist>
+        <item>All tests pass</item>
+        <item>No new warnings or errors</item>
+        <item>Code compiles/builds successfully</item>
+        <item>Changes are minimal and targeted</item>
+        <item>Commit message is clear</item>
+      </checklist>
+    </practice>
+  </best_practices>
+
+  <troubleshooting>
+    <title>Common GitHub Integration Issues</title>
+    
+    <issue name="cannot_fetch_pr">
+      <symptom>GitHub MCP fails to fetch PR details</symptom>
+      <possible_causes>
+        <cause>Invalid PR number or URL</cause>
+        <cause>PR is in a private repository without access</cause>
+        <cause>GitHub API rate limiting</cause>
+        <cause>Network connectivity issues</cause>
+      </possible_causes>
+      <solutions>
+        <solution>Verify PR number/URL is correct</solution>
+        <solution>Check repository access permissions</solution>
+        <solution>Wait and retry if rate limited</solution>
+        <solution>Ask user to provide PR details manually</solution>
+      </solutions>
+    </issue>
+    
+    <issue name="pr_info_incomplete">
+      <symptom>Some PR information is missing</symptom>
+      <possible_causes>
+        <cause>PR is very large with many changes</cause>
+        <cause>Some information not available via API</cause>
+        <cause>Permissions limiting what can be accessed</cause>
+      </possible_causes>
+      <solutions>
+        <solution>Ask user for specific missing information</solution>
+        <solution>Check PR directly on GitHub web interface</solution>
+        <solution>Work with available information</solution>
+      </solutions>
+    </issue>
+  </troubleshooting>
+</github_integration>

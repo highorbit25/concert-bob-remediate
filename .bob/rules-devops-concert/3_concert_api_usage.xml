@@ -1,0 +1,296 @@
+<concert_api_usage>
+  <overview>
+    Detailed guidance on using IBM Concert API for CVE research and package recommendations.
+    All API calls must use credentials from .env file.
+  </overview>
+
+  <authentication>
+    <credentials_source>
+      <file>.env</file>
+      <required_variables>
+        <variable name="CONCERT_API_KEY">
+          <description>API key for Concert authentication</description>
+          <usage>Send as Authorization header</usage>
+        </variable>
+        <variable name="CONCERT_HOSTNAME">
+          <description>Base URL for Concert API (e.g., https://host:port)</description>
+          <usage>Prefix for all API endpoints</usage>
+        </variable>
+        <variable name="CONCERT_INSTANCE_ID">
+          <description>Instance identifier for Concert</description>
+          <usage>Send as InstanceId header</usage>
+        </variable>
+      </required_variables>
+    </credentials_source>
+
+    <loading_credentials>
+      <step>Always source .env before making API calls</step>
+      <command>source .env</command>
+      <verification>Ensure variables are loaded: echo $CONCERT_API_KEY (should show value)</verification>
+    </loading_credentials>
+
+    <security_rules>
+      <rule priority="critical">Never hardcode Concert credentials in code, commands, or PR descriptions</rule>
+      <rule priority="critical">Always use environment variables: ${CONCERT_API_KEY}, ${CONCERT_HOSTNAME}, ${CONCERT_INSTANCE_ID}</rule>
+      <rule priority="high">Never print full credential values in responses; redact when referencing</rule>
+      <rule priority="high">Treat .env as the single source of truth for Concert connection values</rule>
+    </security_rules>
+  </authentication>
+
+  <api_endpoints>
+    <endpoint name="list_applications">
+      <method>GET</method>
+      <path>${CONCERT_HOSTNAME}/concert/core/api/v1/applications</path>
+      <purpose>List all applications to identify target for remediation</purpose>
+      <headers>
+        <header name="Authorization">${CONCERT_API_KEY}</header>
+        <header name="InstanceId">${CONCERT_INSTANCE_ID}</header>
+      </headers>
+      <curl_example>
+        <![CDATA[
+curl -kX GET \
+  -H "Authorization: ${CONCERT_API_KEY}" \
+  -H "InstanceId: ${CONCERT_INSTANCE_ID}" \
+  "${CONCERT_HOSTNAME}/concert/core/api/v1/applications"
+        ]]>
+      </curl_example>
+      <response_fields>
+        <field>id - Application identifier</field>
+        <field>name - Application name</field>
+        <field>description - Application description</field>
+      </response_fields>
+      <usage_scenario>
+        Use when you need to find the application ID for a specific application mentioned in a GitHub issue
+      </usage_scenario>
+    </endpoint>
+
+    <endpoint name="vulnerability_details">
+      <method>GET</method>
+      <path>${CONCERT_HOSTNAME}/concert/core/api/v1/applications/{id}/vulnerability_details</path>
+      <purpose>Get detailed CVE information for specific application</purpose>
+      <headers>
+        <header name="Authorization">${CONCERT_API_KEY}</header>
+        <header name="InstanceId">${CONCERT_INSTANCE_ID}</header>
+      </headers>
+      <curl_example>
+        <![CDATA[
+curl -kX GET \
+  -H "Authorization: ${CONCERT_API_KEY}" \
+  -H "InstanceId: ${CONCERT_INSTANCE_ID}" \
+  "${CONCERT_HOSTNAME}/concert/core/api/v1/applications/{id}/vulnerability_details"
+        ]]>
+      </curl_example>
+      <response_fields>
+        <field>cve_id - CVE identifier</field>
+        <field>severity - Vulnerability severity (Critical, High, Medium, Low)</field>
+        <field>cvss_score - CVSS score</field>
+        <field>affected_packages - List of affected packages</field>
+        <field>description - CVE description</field>
+      </response_fields>
+      <usage_scenario>
+        Use to understand the severity and impact of a CVE before implementing fixes
+      </usage_scenario>
+    </endpoint>
+
+    <endpoint name="application_packages">
+      <method>GET</method>
+      <path>${CONCERT_HOSTNAME}/concert/core/api/v1/applications/{id}/packages</path>
+      <purpose>List all packages used by the application</purpose>
+      <headers>
+        <header name="Authorization">${CONCERT_API_KEY}</header>
+        <header name="InstanceId">${CONCERT_INSTANCE_ID}</header>
+      </headers>
+      <curl_example>
+        <![CDATA[
+curl -kX GET \
+  -H "Authorization: ${CONCERT_API_KEY}" \
+  -H "InstanceId: ${CONCERT_INSTANCE_ID}" \
+  "${CONCERT_HOSTNAME}/concert/core/api/v1/applications/{id}/packages"
+        ]]>
+      </curl_example>
+      <response_fields>
+        <field>package_id - Package identifier</field>
+        <field>name - Package name</field>
+        <field>version - Current version</field>
+        <field>vulnerabilities - Associated CVEs</field>
+      </response_fields>
+      <usage_scenario>
+        Use to identify which packages in an application have known vulnerabilities
+      </usage_scenario>
+    </endpoint>
+
+    <endpoint name="package_details">
+      <method>GET</method>
+      <path>${CONCERT_HOSTNAME}/concert/core/api/v1/software_composition/packages/{id}</path>
+      <purpose>Get detailed package information including CVEs and recommendations</purpose>
+      <headers>
+        <header name="Authorization">${CONCERT_API_KEY}</header>
+        <header name="InstanceId">${CONCERT_INSTANCE_ID}</header>
+      </headers>
+      <curl_example>
+        <![CDATA[
+curl -kX GET \
+  -H "Authorization: ${CONCERT_API_KEY}" \
+  -H "InstanceId: ${CONCERT_INSTANCE_ID}" \
+  "${CONCERT_HOSTNAME}/concert/core/api/v1/software_composition/packages/{id}"
+        ]]>
+      </curl_example>
+      <response_fields>
+        <field>name - Package name</field>
+        <field>current_version - Current version in use</field>
+        <field>vulnerabilities - List of CVEs affecting this package</field>
+        <field>recommendation - Recommended upgrade version</field>
+      </response_fields>
+      <usage_scenario>
+        Use to get Concert's specific recommendation for upgrading a vulnerable package
+      </usage_scenario>
+    </endpoint>
+
+    <endpoint name="recommendations">
+      <method>GET</method>
+      <path>${CONCERT_HOSTNAME}/concert/core/api/v1/software_composition/recommendations</path>
+      <purpose>Fetch Concert's recommended package upgrades</purpose>
+      <headers>
+        <header name="Authorization">${CONCERT_API_KEY}</header>
+        <header name="InstanceId">${CONCERT_INSTANCE_ID}</header>
+      </headers>
+      <query_parameters>
+        <parameter name="package_name">Filter by specific package name</parameter>
+        <parameter name="risk_type">Filter by risk type (e.g., security)</parameter>
+        <parameter name="application_id">Filter by application</parameter>
+      </query_parameters>
+      <curl_example>
+        <![CDATA[
+curl -kX GET \
+  -H "Authorization: ${CONCERT_API_KEY}" \
+  -H "InstanceId: ${CONCERT_INSTANCE_ID}" \
+  "${CONCERT_HOSTNAME}/concert/core/api/v1/software_composition/recommendations?package_name=flask"
+        ]]>
+      </curl_example>
+      <response_fields>
+        <field>package_name - Name of the package</field>
+        <field>current_version - Current version</field>
+        <field>recommended_version - Recommended upgrade version</field>
+        <field>reason - Reason for recommendation (CVE fix, etc.)</field>
+        <field>risk_reduction - Expected risk reduction</field>
+      </response_fields>
+      <usage_scenario>
+        Primary endpoint for getting Concert's package upgrade recommendations for CVE fixes
+      </usage_scenario>
+    </endpoint>
+
+    <endpoint name="build_artifact_packages">
+      <method>GET</method>
+      <path>${CONCERT_HOSTNAME}/concert/core/api/v1/applications/{id}/build_artifacts/{artifact_id}/packages</path>
+      <purpose>Get packages for specific build artifacts (useful for containers)</purpose>
+      <headers>
+        <header name="Authorization">${CONCERT_API_KEY}</header>
+        <header name="InstanceId">${CONCERT_INSTANCE_ID}</header>
+      </headers>
+      <curl_example>
+        <![CDATA[
+curl -kX GET \
+  -H "Authorization: ${CONCERT_API_KEY}" \
+  -H "InstanceId: ${CONCERT_INSTANCE_ID}" \
+  "${CONCERT_HOSTNAME}/concert/core/api/v1/applications/{id}/build_artifacts/{artifact_id}/packages"
+        ]]>
+      </curl_example>
+      <usage_scenario>
+        Use for container-based applications where packages are tied to specific build artifacts
+      </usage_scenario>
+    </endpoint>
+  </api_endpoints>
+
+  <typical_workflow>
+    <title>Standard Concert API Research Flow</title>
+    <steps>
+      <step number="1">
+        <action>Source .env to load credentials</action>
+        <command>source .env</command>
+      </step>
+      <step number="2">
+        <action>List applications to find target application ID</action>
+        <endpoint>GET /applications</endpoint>
+        <extract>application_id from response</extract>
+      </step>
+      <step number="3">
+        <action>Get vulnerability details for the application</action>
+        <endpoint>GET /applications/{id}/vulnerability_details</endpoint>
+        <extract>CVE severity, CVSS score, affected packages</extract>
+      </step>
+      <step number="4">
+        <action>Get package recommendations</action>
+        <endpoint>GET /software_composition/recommendations</endpoint>
+        <filter>By package name from GitHub issue</filter>
+        <extract>recommended_version for the package</extract>
+      </step>
+      <step number="5">
+        <action>Apply recommendation to package manifest</action>
+        <note>Update requirements.txt, package.json, or pom.xml with recommended version</note>
+      </step>
+    </steps>
+  </typical_workflow>
+
+  <error_handling>
+    <error type="401_unauthorized">
+      <cause>Invalid or expired API key</cause>
+      <solution>Verify CONCERT_API_KEY in .env is correct and current</solution>
+    </error>
+    <error type="403_forbidden">
+      <cause>Insufficient permissions or invalid InstanceId</cause>
+      <solution>Verify CONCERT_INSTANCE_ID in .env is correct</solution>
+    </error>
+    <error type="404_not_found">
+      <cause>Application or package ID doesn't exist</cause>
+      <solution>Verify the ID from the list_applications response</solution>
+    </error>
+    <error type="500_server_error">
+      <cause>Concert API is unavailable or experiencing issues</cause>
+      <solution>Document the issue and proceed with manual CVE research from public databases</solution>
+    </error>
+    <error type="timeout">
+      <cause>Network issues or Concert API slow response</cause>
+      <solution>Retry with exponential backoff, or proceed with manual research</solution>
+    </error>
+  </error_handling>
+
+  <best_practices>
+    <practice>Always source .env before any Concert API calls</practice>
+    <practice>Use curl with -k flag for self-signed certificates if needed</practice>
+    <practice>Store application IDs for reuse within the same session</practice>
+    <practice>Parse JSON responses using jq for cleaner output</practice>
+    <practice>Log API responses for debugging and documentation</practice>
+    <practice>Include Concert recommendation details in PR descriptions</practice>
+    <practice>Never expose full API keys in logs or responses</practice>
+  </best_practices>
+
+  <response_parsing>
+    <title>Extracting Key Information from Concert Responses</title>
+    <example type="recommendations">
+      <description>Parse recommended version from recommendations endpoint</description>
+      <command>
+        <![CDATA[
+curl -kX GET \
+  -H "Authorization: ${CONCERT_API_KEY}" \
+  -H "InstanceId: ${CONCERT_INSTANCE_ID}" \
+  "${CONCERT_HOSTNAME}/concert/core/api/v1/software_composition/recommendations?package_name=flask" \
+  | jq -r '.recommendations[0].recommended_version'
+        ]]>
+      </command>
+    </example>
+    <example type="vulnerability_details">
+      <description>Extract CVE severity and CVSS score</description>
+      <command>
+        <![CDATA[
+curl -kX GET \
+  -H "Authorization: ${CONCERT_API_KEY}" \
+  -H "InstanceId: ${CONCERT_INSTANCE_ID}" \
+  "${CONCERT_HOSTNAME}/concert/core/api/v1/applications/{id}/vulnerability_details" \
+  | jq -r '.vulnerabilities[] | select(.cve_id=="CVE-2023-12345") | {severity, cvss_score}'
+        ]]>
+      </command>
+    </example>
+  </response_parsing>
+</concert_api_usage>
+
+<!-- Made with Bob -->

@@ -1,0 +1,640 @@
+<complete_workflow_guide>
+  <overview>
+    This guide provides the complete end-to-end workflow for the vuln-remediation-concert mode,
+    ensuring you follow all steps from PR discovery to successful remediation and PR update.
+    This is the PRIMARY workflow guide that orchestrates all other instruction files.
+  </overview>
+
+  <critical_workflow_principles>
+    <principle name="always_analyze_pr_first">
+      <rule>ALWAYS start by analyzing the PR using GitHub MCP or fetch_github_issue tool</rule>
+      <rationale>You must understand what vulnerability is being fixed and what changes were made</rationale>
+      <never>Never skip PR analysis and jump straight to code changes</never>
+    </principle>
+
+    <principle name="always_run_tests">
+      <rule>ALWAYS run the unit tests to see actual failures before making any code changes</rule>
+      <rationale>You need to see the exact error messages and stack traces to fix correctly</rationale>
+      <never>Never assume what's broken without running tests</never>
+    </principle>
+
+    <principle name="fix_incrementally">
+      <rule>Fix one issue at a time and verify each fix works</rule>
+      <rationale>Incremental fixes are easier to debug and verify</rationale>
+      <never>Never try to fix everything at once without testing</never>
+    </principle>
+
+    <principle name="always_verify_completion">
+      <rule>ALWAYS run the full test suite before marking work complete</rule>
+      <rationale>Ensure all tests pass and no regressions were introduced</rationale>
+      <never>Never assume tests pass without running them</never>
+    </principle>
+
+    <principle name="always_update_pr">
+      <rule>ALWAYS document your changes and update the PR with your fixes</rule>
+      <rationale>The DevOps engineer needs to know what was fixed and why</rationale>
+      <never>Never leave fixes uncommitted or undocumented</never>
+    </principle>
+  </critical_workflow_principles>
+
+  <complete_workflow>
+    <title>Complete Vulnerability Remediation Workflow</title>
+
+    <phase number="1" name="pr_discovery_and_analysis">
+      <title>Phase 1: Discover and Analyze PR</title>
+      <mandatory>YES - Cannot skip this phase</mandatory>
+
+      <step number="1.1">
+        <action>Fetch PR information</action>
+        <when>
+          - User asks "What are the GitHub PRs assigned to me?"
+          - User provides PR number: "Review PR #123"
+          - User provides PR URL: "Review https://github.com/org/repo/pull/123"
+        </when>
+        <tool>fetch_github_issue with appropriate parameters</tool>
+        <output>
+          Present PR details including:
+          - PR number and title
+          - CVE being addressed
+          - Package being upgraded (old version → new version)
+          - Current test status (passing/failing)
+          - Number of failing tests if available
+        </output>
+      </step>
+
+      <step number="1.2">
+        <action>Analyze PR changes</action>
+        <what_to_examine>
+          - Dependency file changes (requirements.txt, package.json, etc.)
+          - Any code changes already made by DevOps engineer
+          - Test file modifications
+          - PR description and comments
+          - Linked issues for CVE context
+        </what_to_examine>
+        <reference>See 2_pr_analysis.xml for detailed analysis patterns</reference>
+      </step>
+
+      <step number="1.3">
+        <action>Research breaking changes</action>
+        <tasks>
+          - Identify the version jump (major/minor/patch)
+          - Look for migration guides or changelogs
+          - Note any deprecated APIs or signature changes
+          - Understand the security fix being applied
+        </tasks>
+      </step>
+
+      <step number="1.4">
+        <action>Present analysis summary to user</action>
+        <format>
+          ## PR Analysis Complete
+          
+          **PR**: #[number] - [title]
+          **CVE**: [cve-id]
+          **Package**: [name] ([old-version] → [new-version])
+          **Change Type**: [major/minor/patch] version upgrade
+          
+          ### Breaking Changes Identified
+          - [breaking change 1]
+          - [breaking change 2]
+          
+          ### Next Steps
+          I will now:
+          1. Run the unit tests to see exact failures
+          2. Fix the code to work with the upgraded package
+          3. Verify all tests pass
+          4. Update the PR with the fixes
+        </format>
+      </step>
+    </phase>
+
+    <phase number="2" name="test_execution_and_failure_analysis">
+      <title>Phase 2: Run Tests and Analyze Failures</title>
+      <mandatory>YES - Must run tests before fixing</mandatory>
+
+      <step number="2.1">
+        <action>Set up test environment</action>
+        <commands>
+          <python>
+            # Install dependencies with upgraded versions
+            pip install -r requirements.txt
+            # Or if in a specific directory
+            cd [app-directory] && pip install -r requirements.txt
+          </python>
+          <nodejs>
+            npm install
+          </nodejs>
+          <java>
+            mvn clean install -DskipTests
+          </java>
+        </commands>
+        <tool>execute_command</tool>
+      </step>
+
+      <step number="2.2">
+        <action>Run the full test suite</action>
+        <commands>
+          <python>pytest -v</python>
+          <nodejs>npm test</nodejs>
+          <java>mvn test</java>
+        </commands>
+        <tool>execute_command</tool>
+        <capture>
+          - Total number of tests
+          - Number of failures
+          - Specific failing test names
+          - Error messages and stack traces
+          - Any warnings or deprecations
+        </capture>
+      </step>
+
+      <step number="2.3">
+        <action>Analyze test failures</action>
+        <categorize_failures>
+          - Import errors (module not found, cannot import)
+          - API signature errors (wrong number of arguments)
+          - Attribute errors (method/attribute doesn't exist)
+          - Assertion failures (behavior changed)
+          - Deprecation warnings
+        </categorize_failures>
+        <reference>See 3_testing_strategy.xml for detailed analysis</reference>
+      </step>
+
+      <step number="2.4">
+        <action>Identify root causes</action>
+        <for_each_failure>
+          - Read the failing test code
+          - Examine the application code being tested
+          - Search for all usages of the upgraded package
+          - Compare with package documentation
+          - Determine the specific fix needed
+        </for_each_failure>
+      </step>
+
+      <step number="2.5">
+        <action>Present failure analysis to user</action>
+        <format>
+          ## Test Execution Results
+          
+          **Total Tests**: [N]
+          **Passing**: [N]
+          **Failing**: [N]
+          
+          ### Failure Categories
+          1. Import errors: [N] tests
+             - [specific error pattern]
+          2. API signature changes: [N] tests
+             - [specific error pattern]
+          3. Deprecated methods: [N] tests
+             - [specific error pattern]
+          
+          ### Root Causes Identified
+          - [root cause 1]
+          - [root cause 2]
+          
+          I will now fix these issues one by one.
+        </format>
+      </step>
+    </phase>
+
+    <phase number="3" name="code_remediation">
+      <title>Phase 3: Fix Code Issues</title>
+      <mandatory>YES - This is the core work</mandatory>
+
+      <step number="3.1">
+        <action>Prioritize fixes</action>
+        <priority_order>
+          1. Import errors (blocking other tests)
+          2. API signature changes (widespread impact)
+          3. Deprecated API usage
+          4. Behavior changes
+        </priority_order>
+      </step>
+
+      <step number="3.2">
+        <action>Fix first issue</action>
+        <workflow>
+          1. Read the file that needs fixing
+          2. Identify exact lines to change
+          3. Use apply_diff for surgical edits
+          4. Add comments explaining the change
+        </workflow>
+        <tools>
+          <tool>read_file - Get exact file content</tool>
+          <tool>apply_diff - Make targeted changes</tool>
+          <tool>insert_content - Add new imports if needed</tool>
+        </tools>
+        <reference>See 4_code_fixing.xml for fix patterns</reference>
+      </step>
+
+      <step number="3.3">
+        <action>Verify the fix</action>
+        <commands>
+          Run the specific test(s) that were failing
+        </commands>
+        <tool>execute_command</tool>
+        <check>
+          - Does the test now pass?
+          - Are there any new errors?
+          - Did we introduce any regressions?
+        </check>
+      </step>
+
+      <step number="3.4">
+        <action>Iterate for remaining failures</action>
+        <repeat>
+          Repeat steps 3.2-3.3 for each failing test or group of related failures
+        </repeat>
+        <track_progress>
+          Keep user informed of progress:
+          - "Fixed import errors, 3 tests now passing"
+          - "Updated API calls, 5 more tests passing"
+          - "Replaced deprecated methods, 2 tests remaining"
+        </track_progress>
+      </step>
+
+      <step number="3.5">
+        <action>Run full test suite</action>
+        <when>After all known failures are fixed</when>
+        <command>Run complete test suite</command>
+        <verify>
+          - All tests pass
+          - No new failures introduced
+          - No regressions
+        </verify>
+      </step>
+    </phase>
+
+    <phase number="4" name="validation_and_documentation">
+      <title>Phase 4: Validate and Document</title>
+      <mandatory>YES - Must verify before completion</mandatory>
+
+      <step number="4.1">
+        <action>Final test verification</action>
+        <checklist>
+          ✓ All unit tests pass
+          ✓ No new test failures
+          ✓ No deprecation warnings (if possible)
+          ✓ Code compiles/builds without errors
+        </checklist>
+      </step>
+
+      <step number="4.2">
+        <action>Verify security fix maintained</action>
+        <check>
+          - Package version is still upgraded (not downgraded)
+          - No workarounds that compromise security
+          - CVE is actually fixed
+        </check>
+      </step>
+
+      <step number="4.3">
+        <action>Review all changes</action>
+        <tool>obtain_git_diff</tool>
+        <verify>
+          - Changes are minimal and targeted
+          - No unrelated modifications
+          - Comments explain non-obvious changes
+          - Code style is consistent
+        </verify>
+      </step>
+
+      <step number="4.4">
+        <action>Document the fixes</action>
+        <create_summary>
+          ## Remediation Summary
+          
+          ### Changes Made
+          - [List all files modified and why]
+          
+          ### Root Cause
+          - [Explain what caused the test failures]
+          
+          ### Testing
+          - All [N] tests now pass
+          - No regressions introduced
+          - Security fix verified
+          
+          ### Files Modified
+          - `[file1]`: [description]
+          - `[file2]`: [description]
+        </create_summary>
+      </step>
+    </phase>
+
+    <phase number="5" name="pr_update">
+      <title>Phase 5: Update PR</title>
+      <mandatory>YES - Must update PR with fixes</mandatory>
+
+      <critical_requirement>
+        <rule>ALWAYS commit to the EXISTING PR branch, NEVER create a new branch</rule>
+        <why>
+          - The PR already has a branch (e.g., "fix/cve-2023-12345-flask")
+          - Committing to that branch updates the PR automatically
+          - This triggers the CI/CD workflow to re-run tests
+          - The workflow will assign reviewers based on test results
+        </why>
+        <never>
+          - Never create a new branch like "pr-38" or "fix-tests"
+          - Never push to a different branch than the PR's head branch
+        </never>
+      </critical_requirement>
+
+      <step number="5.0">
+        <action>Identify the PR's source branch</action>
+        <how>
+          From the PR metadata you fetched earlier, extract the head branch name.
+          This is typically shown as: "author wants to merge from [branch-name] into main"
+        </how>
+        <example>
+          PR #38: "highorbit25 wants to merge from fix/cve-2023-12345-flask"
+          → Branch to commit to: fix/cve-2023-12345-flask
+        </example>
+        <store>Remember this branch name for the git commands</store>
+      </step>
+
+      <step number="5.1">
+        <action>Prepare commit message</action>
+        <format>
+          fix: resolve unit test failures after [package] upgrade
+          
+          - Fixed import paths for [package] v[version]
+          - Updated API calls to match new signatures
+          - Replaced deprecated methods
+          
+          Addresses failing tests in PR #[number]
+          Related to CVE-[id]
+        </format>
+      </step>
+
+      <step number="5.2">
+        <action>Commit and push to the PR branch</action>
+        <commands>
+          <command number="1">
+            <action>Ensure on correct branch</action>
+            <syntax>git checkout [pr-branch-name]</syntax>
+            <example>git checkout fix/cve-2023-12345-flask</example>
+          </command>
+          <command number="2">
+            <action>Stage changes</action>
+            <syntax>git add [modified-files]</syntax>
+            <example>git add app/vulnerable/main.py</example>
+          </command>
+          <command number="3">
+            <action>Commit with message</action>
+            <syntax>git commit -m "[message]"</syntax>
+          </command>
+          <command number="4">
+            <action>Push to PR branch</action>
+            <syntax>git push origin [pr-branch-name]</syntax>
+            <example>git push origin fix/cve-2023-12345-flask</example>
+            <result>
+              This will:
+              - Update the existing PR #[number]
+              - Trigger .github/workflows/pr-unit-test.yml
+              - Re-run unit tests
+              - Auto-assign reviewers based on results
+            </result>
+          </command>
+        </commands>
+        <critical>
+          The branch name in the push command MUST match the PR's head branch exactly.
+          This is how you update the existing PR instead of creating a new one.
+        </critical>
+      </step>
+
+      <step number="5.3">
+        <action>Add comment to PR documenting the fixes</action>
+        <tool>use_mcp_tool with github server</tool>
+        <mcp_tool>add_issue_comment</mcp_tool>
+        
+        <how_to_use>
+          <use_mcp_tool>
+            <server_name>github</server_name>
+            <tool_name>add_issue_comment</tool_name>
+            <arguments>
+              {
+                "owner": "[extract from PR metadata]",
+                "repo": "[extract from PR metadata]",
+                "issue_number": [pr-number],
+                "body": "[formatted comment - see template below]"
+              }
+            </arguments>
+          </use_mcp_tool>
+        </how_to_use>
+        
+        <comment_template>
+          ## Unit Test Fixes
+          
+          I've fixed the failing unit tests caused by the [package] upgrade.
+          
+          ### Changes Made
+          - [List specific changes with file names]
+          - [Be specific about what was updated]
+          
+          ### Root Cause
+          The upgrade from v[old] to v[new] introduced these breaking changes:
+          - [Breaking change 1]
+          - [Breaking change 2]
+          
+          ### Testing
+          - All [N] unit tests now pass ✅
+          - No regressions introduced
+          - Security fix verified and maintained
+          
+          ### Files Modified
+          - `[file1]`: [reason for change]
+          - `[file2]`: [reason for change]
+          
+          Ready for review!
+        </comment_template>
+        
+        <example>
+          <use_mcp_tool>
+            <server_name>github</server_name>
+            <tool_name>add_issue_comment</tool_name>
+            <arguments>
+              {
+                "owner": "your-org",
+                "repo": "concert-bob-remediate",
+                "issue_number": 38,
+                "body": "## Unit Test Fixes\n\nI've fixed the failing unit tests caused by the Flask upgrade.\n\n### Changes Made\n- Updated import path from `flask.json` to `flask` in main.py\n- Modified test assertions to use `request.get_json()` instead of `request.json`\n\n### Root Cause\nThe upgrade from Flask v2.0.1 to v3.1.0 introduced these breaking changes:\n- `flask.json` module was removed, functionality moved to main `flask` module\n- `request.json` property deprecated in favor of `request.get_json()` method\n\n### Testing\n- All 3 unit tests now pass ✅\n- No regressions introduced\n- Security fix (CVE-2024-12345) verified and maintained\n\n### Files Modified\n- `app/vulnerable/main.py`: Updated Flask imports and request handling\n- `app/vulnerable/test_main.py`: Updated test assertions for new API\n\nReady for review!"
+              }
+            </arguments>
+          </use_mcp_tool>
+        </example>
+        
+        <why_important>
+          - Documents your work for the PR reviewers
+          - Explains the root cause of failures
+          - Shows what was changed and why
+          - Confirms all tests pass
+          - Provides context for Software Lead review
+          - Creates a permanent record in the PR history
+        </why_important>
+      </step>
+
+      <step number="5.4">
+        <action>Present completion summary</action>
+        <use_tool>attempt_completion</use_tool>
+        <result_format>
+          Remediation complete.
+          
+          - Updated [files] to work with [package] v[version]
+          - Fixed [N] failing tests
+          - All tests now passing
+          - Pushed fixes to PR branch
+          - Added documentation comment to PR
+          - PR ready for review
+        </result_format>
+      </step>
+    </phase>
+  </complete_workflow>
+
+  <workflow_decision_tree>
+    <title>When to Use Each Phase</title>
+
+    <decision point="user_request">
+      <if condition="user asks about assigned PRs">
+        <then>Start at Phase 1, Step 1.1 - Fetch PRs</then>
+      </if>
+      <if condition="user provides PR number or URL">
+        <then>Start at Phase 1, Step 1.1 - Fetch that specific PR</then>
+      </if>
+      <if condition="user says 'fix the tests' without PR context">
+        <then>Ask which PR they want to work on</then>
+      </if>
+    </decision>
+
+    <decision point="after_pr_analysis">
+      <always>Proceed to Phase 2 - Run tests</always>
+      <never>Skip to Phase 3 without running tests</never>
+    </decision>
+
+    <decision point="after_test_execution">
+      <if condition="tests are passing">
+        <then>Inform user that tests already pass, no fixes needed</then>
+      </if>
+      <if condition="tests are failing">
+        <then>Proceed to Phase 3 - Fix code</then>
+      </if>
+    </decision>
+
+    <decision point="after_each_fix">
+      <always>Run tests to verify the fix</always>
+      <if condition="fix works">
+        <then>Move to next failure</then>
+      </if>
+      <if condition="fix doesn't work">
+        <then>Debug and try different approach</then>
+      </if>
+    </decision>
+
+    <decision point="after_all_fixes">
+      <always>Run full test suite</always>
+      <if condition="all tests pass">
+        <then>Proceed to Phase 4 - Validation</then>
+      </if>
+      <if condition="some tests still fail">
+        <then>Return to Phase 3 - Fix remaining issues</then>
+      </if>
+    </decision>
+
+    <decision point="after_validation">
+      <always>Proceed to Phase 5 - Update PR</always>
+      <never>Mark complete without updating PR</never>
+    </decision>
+  </workflow_decision_tree>
+
+  <common_mistakes_to_avoid>
+    <mistake name="skipping_pr_analysis">
+      <description>Trying to fix code without understanding the PR</description>
+      <consequence>You won't know what vulnerability is being fixed or what changed</consequence>
+      <correct_approach>Always start with Phase 1 - PR analysis</correct_approach>
+    </mistake>
+
+    <mistake name="not_running_tests">
+      <description>Making code changes without seeing actual test failures</description>
+      <consequence>You're guessing at what's broken instead of knowing</consequence>
+      <correct_approach>Always run tests in Phase 2 before fixing</correct_approach>
+    </mistake>
+
+    <mistake name="fixing_without_verification">
+      <description>Making multiple changes without testing each one</description>
+      <consequence>Hard to debug when something doesn't work</consequence>
+      <correct_approach>Fix incrementally and verify each fix</correct_approach>
+    </mistake>
+
+    <mistake name="not_updating_pr">
+      <description>Fixing code locally but not pushing or documenting</description>
+      <consequence>DevOps engineer doesn't know what was fixed</consequence>
+      <correct_approach>Always complete Phase 5 - Update PR</correct_approach>
+    </mistake>
+
+    <mistake name="compromising_security">
+      <description>Downgrading packages or disabling security features to make tests pass</description>
+      <consequence>Reintroduces the vulnerability</consequence>
+      <correct_approach>Fix code to work with the security patch, never weaken security</correct_approach>
+    </mistake>
+  </common_mistakes_to_avoid>
+
+  <success_criteria>
+    <criterion>PR has been analyzed and understood</criterion>
+    <criterion>Tests have been run and failures identified</criterion>
+    <criterion>Code has been fixed to work with upgraded package</criterion>
+    <criterion>All unit tests pass</criterion>
+    <criterion>No regressions introduced</criterion>
+    <criterion>Security fix is maintained</criterion>
+    <criterion>Changes are documented</criterion>
+    <criterion>PR has been updated with fixes</criterion>
+  </success_criteria>
+
+  <quick_reference>
+    <title>Quick Workflow Checklist</title>
+    <checklist>
+      <phase>Phase 1: PR Analysis</phase>
+      <items>
+        ☐ Fetch PR details via GitHub MCP
+        ☐ Identify CVE and package changes
+        ☐ Research breaking changes
+        ☐ Present analysis to user
+      </items>
+
+      <phase>Phase 2: Test Execution</phase>
+      <items>
+        ☐ Install dependencies
+        ☐ Run full test suite
+        ☐ Capture failure details
+        ☐ Analyze root causes
+        ☐ Present failure analysis
+      </items>
+
+      <phase>Phase 3: Code Remediation</phase>
+      <items>
+        ☐ Prioritize fixes
+        ☐ Fix first issue
+        ☐ Verify fix works
+        ☐ Iterate for remaining failures
+        ☐ Run full test suite
+      </items>
+
+      <phase>Phase 4: Validation</phase>
+      <items>
+        ☐ Verify all tests pass
+        ☐ Check security fix maintained
+        ☐ Review all changes
+        ☐ Document fixes
+      </items>
+
+      <phase>Phase 5: PR Update</phase>
+      <items>
+        ☐ Prepare commit message
+        ☐ Commit and push changes
+        ☐ Add PR comment
+        ☐ Present completion summary
+      </items>
+    </checklist>
+  </quick_reference>
+</complete_workflow_guide>
+
+<!-- Made with Bob -->

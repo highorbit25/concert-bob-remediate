@@ -1,0 +1,225 @@
+<git_workflow_best_practices>
+  <overview>
+    Critical Git workflow practices for CVE remediation to ensure changes are made on the correct branch.
+  </overview>
+
+  <golden_rule>
+    <rule priority="critical">
+      NEVER make changes on the main/master branch. ALWAYS create and checkout the fix branch FIRST.
+    </rule>
+  </golden_rule>
+
+  <correct_workflow_order>
+    <title>The Correct Sequence</title>
+    <step number="1">
+      <action>Create and checkout the fix branch locally</action>
+      <command>git checkout -b fix/cve-2023-12345-flask</command>
+      <note>Creates and checks out the branch in one command</note>
+    </step>
+
+    <step number="2">
+      <action>Verify you are on the fix branch BEFORE making any changes</action>
+      <command>git branch --show-current</command>
+      <expected_output>fix/cve-2023-12345-flask</expected_output>
+      <critical_check>
+        If output is "main" or "master", STOP and create or checkout the fix branch first
+      </critical_check>
+    </step>
+
+    <step number="3">
+      <action>Make changes to package manifest files</action>
+      <tools>
+        <tool>apply_diff</tool>
+        <tool>write_to_file</tool>
+        <tool>insert_content</tool>
+      </tools>
+      <note>All file modifications happen on the local fix branch</note>
+    </step>
+
+    <step number="4">
+      <action>Commit changes on the fix branch locally</action>
+      <commands>
+        <command>git add requirements.txt</command>
+        <command>git commit -m "fix: upgrade flask to 2.3.3 for CVE-2023-12345"</command>
+      </commands>
+    </step>
+
+    <step number="5">
+      <action>Push the fix branch to GitHub only when ready</action>
+      <command>git push -u origin fix/cve-2023-12345-flask</command>
+      <note>
+        This is the first time the remote branch is created. The -u flag sets the upstream tracking branch.
+      </note>
+    </step>
+
+    <step number="6">
+      <action>Create pull request from fix branch to main</action>
+      <tool>use_mcp_tool with github/create_pull_request</tool>
+      <parameters>
+        <parameter>head: fix/cve-2023-12345-flask</parameter>
+        <parameter>base: main</parameter>
+      </parameters>
+    </step>
+  </correct_workflow_order>
+
+  <incorrect_workflow>
+    <title>What NOT to Do</title>
+    <anti_pattern name="modify_main_first">
+      <description>Making changes on main branch then trying to move them to fix branch</description>
+      <why_wrong>
+        - Pollutes main branch with uncommitted changes
+        - Requires complex git operations to move changes
+        - Risk of accidentally committing to main
+        - Confusing for code review
+      </why_wrong>
+      <symptoms>
+        <symptom>git status shows modified files on main branch</symptom>
+        <symptom>Need to use git stash to move changes</symptom>
+        <symptom>Accidentally pushed to main instead of fix branch</symptom>
+      </symptoms>
+    </anti_pattern>
+
+    <anti_pattern name="create_branch_after_changes">
+      <description>Creating branch after making file modifications</description>
+      <why_wrong>
+        - Changes are already tracked on current branch (main)
+        - Requires git stash or manual copying of changes
+        - Increases the risk of accidental commits on main
+      </why_wrong>
+    </anti_pattern>
+
+    <anti_pattern name="push_before_ready">
+      <description>Pushing the branch to GitHub before local work is ready for review</description>
+      <why_wrong>
+        - Creates unnecessary remote noise
+        - May expose incomplete remediation work
+        - Makes PR timing less intentional
+      </why_wrong>
+      <solution>
+        Keep work local on the fix branch until you are ready to publish it with git push -u origin {branch-name}
+      </solution>
+    </anti_pattern>
+  </incorrect_workflow>
+
+  <verification_checklist>
+    <title>Before Making Any File Changes</title>
+    <checklist>
+      <item priority="critical">
+        <check>Run: git branch --show-current</check>
+        <expected>Output should be fix/cve-{CVE-ID}-{package-name}</expected>
+        <action_if_wrong>Create or checkout the fix branch immediately</action_if_wrong>
+      </item>
+      <item priority="high">
+        <check>Ensure the fix branch was created locally before editing files</check>
+        <command>git branch --show-current</command>
+      </item>
+      <item priority="medium">
+        <check>Ensure working directory is clean before starting</check>
+        <command>git status</command>
+        <expected>No uncommitted changes on main</expected>
+      </item>
+    </checklist>
+  </verification_checklist>
+
+  <recovery_procedures>
+    <title>What to Do If You Made Changes on Main</title>
+    <scenario name="uncommitted_changes_on_main">
+      <description>You modified files on main but haven't committed yet</description>
+      <recovery_steps>
+        <step>Stash your changes: git stash</step>
+        <step>Create and checkout fix branch: git checkout -b fix/cve-{CVE-ID}-{package-name}</step>
+        <step>Apply stashed changes: git stash pop</step>
+        <step>Verify changes are now on fix branch: git status</step>
+        <step>Proceed with commit, then push when ready</step>
+      </recovery_steps>
+    </scenario>
+
+    <scenario name="committed_to_main_by_mistake">
+      <description>You already committed changes to main branch</description>
+      <recovery_steps>
+        <step>Create fix branch from current main: git checkout -b fix/cve-{CVE-ID}-{package-name}</step>
+        <step>Push fix branch when ready: git push -u origin fix/cve-{CVE-ID}-{package-name}</step>
+        <step>Checkout main: git checkout main</step>
+        <step>Reset main to remote: git reset --hard origin/main</step>
+        <step>Create PR from fix branch</step>
+      </recovery_steps>
+      <warning>
+        Only do this if you haven't pushed to main yet. If you've pushed to main, coordinate with team.
+      </warning>
+    </scenario>
+
+    <scenario name="pushed_to_main_by_mistake">
+      <description>You pushed changes to main branch on remote</description>
+      <recovery_steps>
+        <step>STOP - Do not proceed without team coordination</step>
+        <step>Notify team that main was modified</step>
+        <step>Create fix branch from current main</step>
+        <step>Revert main to previous state (requires force push)</step>
+        <step>Create PR from fix branch</step>
+      </recovery_steps>
+      <warning>
+        This requires force pushing to main. Coordinate with team first.
+      </warning>
+    </scenario>
+  </recovery_procedures>
+
+  <git_push_guidance>
+    <title>Pushing the Local Fix Branch to GitHub</title>
+
+    <workflow>
+      <step>Create and work on the branch locally first</step>
+      <step>Commit local changes once the remediation is ready</step>
+      <step>Publish the branch with: git push -u origin fix/cve-{CVE-ID}-{package-name}</step>
+      <step>Verify the remote branch exists</step>
+      <step>Create the pull request from the published branch</step>
+    </workflow>
+
+    <best_practice>
+      Creating the branch locally first and pushing only at the end is valid and preferred for a cleaner workflow.
+    </best_practice>
+
+    <important_note>
+      The remote branch does not need to exist before you start working. It will be created automatically by the first git push -u origin {branch-name}.
+    </important_note>
+  </git_push_guidance>
+
+  <pull_request_guidance>
+    <title>Creating the Pull Request</title>
+    <tool name="create_pull_request">
+      <purpose>Creates PR from head branch to base branch</purpose>
+      <parameters>
+        <parameter name="head">
+          <value>fix/cve-{CVE-ID}-{package-name}</value>
+          <description>The published branch with your changes</description>
+        </parameter>
+        <parameter name="base">
+          <value>main</value>
+          <description>The branch you want to merge into</description>
+        </parameter>
+      </parameters>
+    </tool>
+  </pull_request_guidance>
+
+  <best_practices_summary>
+    <practice priority="critical">
+      Create and checkout branch BEFORE any file modifications
+    </practice>
+    <practice priority="critical">
+      Always verify current branch before making changes
+    </practice>
+    <practice priority="high">
+      Use git branch --show-current frequently during workflow
+    </practice>
+    <practice priority="high">
+      Keep the fix branch local until the work is ready to publish
+    </practice>
+    <practice priority="medium">
+      Keep main branch clean - never work directly on it
+    </practice>
+    <practice priority="medium">
+      If you make a mistake, use git stash to recover cleanly
+    </practice>
+  </best_practices_summary>
+</git_workflow_best_practices>
+
+<!-- Made with Bob -->

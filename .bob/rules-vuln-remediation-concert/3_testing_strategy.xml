@@ -1,0 +1,587 @@
+<testing_strategy>
+  <overview>
+    Comprehensive strategies for running, debugging, and fixing unit tests after
+    package upgrades. This guide covers test execution, failure analysis, and
+    systematic debugging approaches.
+  </overview>
+
+  <test_execution>
+    <title>Running Tests Effectively</title>
+    
+    <environment_setup>
+      <step number="1">
+        <action>Ensure clean environment</action>
+        <commands>
+          <python>
+            # Remove old virtual environment
+            rm -rf venv/
+            # Create fresh virtual environment
+            python -m venv venv
+            source venv/bin/activate  # On Windows: venv\Scripts\activate
+          </python>
+          <nodejs>
+            # Remove node_modules and lock files
+            rm -rf node_modules package-lock.json
+            # Fresh install
+            npm install
+          </nodejs>
+          <java>
+            # Clean build artifacts
+            mvn clean
+            # Or for Gradle
+            gradle clean
+          </java>
+        </commands>
+      </step>
+      
+      <step number="2">
+        <action>Install dependencies with upgraded versions</action>
+        <importance>
+          Critical to install the exact versions from the PR to reproduce failures
+        </importance>
+        <commands>
+          <python>pip install -r requirements.txt</python>
+          <nodejs>npm install</nodejs>
+          <java>mvn install -DskipTests</java>
+        </commands>
+      </step>
+      
+      <step number="3">
+        <action>Verify installation</action>
+        <commands>
+          <python>pip list | grep [package-name]</python>
+          <nodejs>npm list [package-name]</nodejs>
+          <java>mvn dependency:tree | grep [package-name]</java>
+        </commands>
+      </step>
+    </environment_setup>
+    
+    <test_execution_strategies>
+      <strategy name="full_suite_first">
+        <description>Run complete test suite to get overview</description>
+        <commands>
+          <python>pytest -v</python>
+          <nodejs>npm test</nodejs>
+          <java>mvn test</java>
+        </commands>
+        <purpose>
+          - Get total count of failures
+          - Identify failure patterns
+          - Understand scope of work
+        </purpose>
+      </strategy>
+      
+      <strategy name="isolated_test_execution">
+        <description>Run individual failing tests for detailed analysis</description>
+        <commands>
+          <python>pytest tests/test_file.py::test_function -v</python>
+          <nodejs>npm test -- --testNamePattern="test name"</nodejs>
+          <java>mvn test -Dtest=TestClassName#testMethodName</java>
+        </commands>
+        <purpose>
+          - Focus on specific failure
+          - Get detailed error output
+          - Faster iteration during fixes
+        </purpose>
+      </strategy>
+      
+      <strategy name="verbose_output">
+        <description>Enable maximum verbosity for debugging</description>
+        <commands>
+          <python>pytest -vv -s --tb=long</python>
+          <nodejs>npm test -- --verbose</nodejs>
+          <java>mvn test -X</java>
+        </commands>
+        <purpose>
+          - See full stack traces
+          - View print statements
+          - Understand test flow
+        </purpose>
+      </strategy>
+      
+      <strategy name="stop_on_first_failure">
+        <description>Stop after first failure for quick debugging</description>
+        <commands>
+          <python>pytest -x</python>
+          <nodejs>npm test -- --bail</nodejs>
+          <java>mvn test -Dsurefire.skipAfterFailureCount=1</java>
+        </commands>
+        <purpose>
+          - Fix one issue at a time
+          - Faster feedback loop
+          - Avoid overwhelming output
+        </purpose>
+      </strategy>
+    </test_execution_strategies>
+    
+    <output_capture>
+      <title>Capturing Test Output for Analysis</title>
+      
+      <capture_methods>
+        <method name="file_redirect">
+          <description>Save test output to file for review</description>
+          <commands>
+            <python>pytest -v > test_output.txt 2>&1</python>
+            <nodejs>npm test > test_output.txt 2>&1</nodejs>
+            <java>mvn test > test_output.txt 2>&1</java>
+          </commands>
+        </method>
+        
+        <method name="structured_output">
+          <description>Generate structured test reports</description>
+          <commands>
+            <python>pytest --junit-xml=test-results.xml</python>
+            <nodejs>npm test -- --json --outputFile=test-results.json</nodejs>
+            <java>mvn test (generates target/surefire-reports/)</java>
+          </commands>
+        </method>
+      </capture_methods>
+      
+      <what_to_capture>
+        <item>Test names and status (pass/fail/skip)</item>
+        <item>Error messages and exception types</item>
+        <item>Full stack traces</item>
+        <item>Expected vs actual values</item>
+        <item>Any warnings or deprecation notices</item>
+        <item>Test execution time</item>
+      </what_to_capture>
+    </output_capture>
+  </test_execution>
+
+  <failure_analysis>
+    <title>Analyzing Test Failures</title>
+    
+    <failure_categorization>
+      <category name="import_failures">
+        <symptoms>
+          <symptom>ModuleNotFoundError</symptom>
+          <symptom>ImportError</symptom>
+          <symptom>AttributeError on import</symptom>
+        </symptoms>
+        <analysis_approach>
+          - Check if module was renamed or moved
+          - Verify package is installed correctly
+          - Look for import path changes in package docs
+          - Check if submodule structure changed
+        </analysis_approach>
+        <example_errors>
+          <error>ModuleNotFoundError: No module named 'package.old_module'</error>
+          <error>ImportError: cannot import name 'OldClass' from 'package'</error>
+          <error>AttributeError: module 'package' has no attribute 'function'</error>
+        </example_errors>
+      </category>
+      
+      <category name="api_signature_failures">
+        <symptoms>
+          <symptom>TypeError: missing required argument</symptom>
+          <symptom>TypeError: got unexpected keyword argument</symptom>
+          <symptom>TypeError: takes X arguments but Y were given</symptom>
+        </symptoms>
+        <analysis_approach>
+          - Compare old vs new function signatures
+          - Check for new required parameters
+          - Look for removed or renamed parameters
+          - Verify parameter order hasn't changed
+        </analysis_approach>
+        <example_errors>
+          <error>TypeError: function() missing 1 required positional argument: 'new_param'</error>
+          <error>TypeError: function() got an unexpected keyword argument 'old_param'</error>
+          <error>TypeError: function() takes 2 positional arguments but 3 were given</error>
+        </example_errors>
+      </category>
+      
+      <category name="assertion_failures">
+        <symptoms>
+          <symptom>AssertionError</symptom>
+          <symptom>Expected X but got Y</symptom>
+          <symptom>Values don't match</symptom>
+        </symptoms>
+        <analysis_approach>
+          - Check if package behavior changed
+          - Verify if return types changed
+          - Look for changes in default values
+          - Check if output format changed
+        </analysis_approach>
+        <example_errors>
+          <error>AssertionError: assert 'value1' == 'value2'</error>
+          <error>AssertionError: Expected dict but got object</error>
+          <error>AssertionError: Lists differ: [1, 2] != [1, 2, 3]</error>
+        </example_errors>
+      </category>
+      
+      <category name="attribute_errors">
+        <symptoms>
+          <symptom>AttributeError: object has no attribute</symptom>
+          <symptom>AttributeError: module has no attribute</symptom>
+        </symptoms>
+        <analysis_approach>
+          - Check if attribute was renamed
+          - Verify if attribute was removed
+          - Look for moved attributes
+          - Check if access pattern changed (property vs method)
+        </analysis_approach>
+        <example_errors>
+          <error>AttributeError: 'Class' object has no attribute 'old_method'</error>
+          <error>AttributeError: module 'package' has no attribute 'OLD_CONSTANT'</error>
+        </example_errors>
+      </category>
+      
+      <category name="deprecation_warnings">
+        <symptoms>
+          <symptom>DeprecationWarning</symptom>
+          <symptom>FutureWarning</symptom>
+          <symptom>PendingDeprecationWarning</symptom>
+        </symptoms>
+        <analysis_approach>
+          - Note the warning message
+          - Find recommended replacement
+          - Plan to update before next major version
+          - May not cause immediate failures but should be fixed
+        </analysis_approach>
+        <example_warnings>
+          <warning>DeprecationWarning: 'old_function' is deprecated, use 'new_function' instead</warning>
+          <warning>FutureWarning: This feature will be removed in version 3.0</warning>
+        </example_warnings>
+      </category>
+    </failure_categorization>
+    
+    <stack_trace_analysis>
+      <title>Reading and Understanding Stack Traces</title>
+      
+      <stack_trace_anatomy>
+        <component name="error_type">
+          <description>The exception class name</description>
+          <examples>TypeError, ValueError, AttributeError, ImportError</examples>
+          <importance>Indicates the category of problem</importance>
+        </component>
+        
+        <component name="error_message">
+          <description>Human-readable description of the error</description>
+          <importance>Often contains specific details about what went wrong</importance>
+        </component>
+        
+        <component name="call_stack">
+          <description>Sequence of function calls leading to the error</description>
+          <reading_strategy>
+            - Start from the bottom (where error occurred)
+            - Work upward to understand call chain
+            - Identify first frame in your code (vs library code)
+          </reading_strategy>
+        </component>
+        
+        <component name="file_and_line">
+          <description>Exact location where error occurred</description>
+          <format>File "path/to/file.py", line 42, in function_name</format>
+          <importance>Tells you exactly where to look</importance>
+        </component>
+        
+        <component name="code_context">
+          <description>The actual line of code that failed</description>
+          <importance>Shows what operation was being attempted</importance>
+        </component>
+      </stack_trace_anatomy>
+      
+      <reading_strategy>
+        <step number="1">
+          <action>Identify the error type and message</action>
+          <details>This tells you what category of problem you're dealing with</details>
+        </step>
+        
+        <step number="2">
+          <action>Find the first frame in your code</action>
+          <details>
+            Skip library/framework frames and focus on your application code
+          </details>
+        </step>
+        
+        <step number="3">
+          <action>Examine the failing line</action>
+          <details>
+            Look at the exact code that caused the error
+          </details>
+        </step>
+        
+        <step number="4">
+          <action>Trace back to understand context</action>
+          <details>
+            Follow the call stack to understand how you got there
+          </details>
+        </step>
+        
+        <step number="5">
+          <action>Look for patterns across multiple failures</action>
+          <details>
+            If multiple tests fail similarly, there's likely a common root cause
+          </details>
+        </step>
+      </reading_strategy>
+    </stack_trace_analysis>
+  </failure_analysis>
+
+  <debugging_techniques>
+    <title>Systematic Debugging Approaches</title>
+    
+    <technique name="binary_search_debugging">
+      <description>
+        Narrow down the problem by testing intermediate states
+      </description>
+      <steps>
+        <step>Start with known working version</step>
+        <step>Upgrade to problematic version</step>
+        <step>If multiple changes, test each change individually</step>
+        <step>Identify which specific change causes the failure</step>
+      </steps>
+      <when_to_use>
+        When multiple packages were upgraded or many changes were made
+      </when_to_use>
+    </technique>
+    
+    <technique name="minimal_reproduction">
+      <description>
+        Create smallest possible test case that reproduces the issue
+      </description>
+      <steps>
+        <step>Copy failing test to isolated file</step>
+        <step>Remove unrelated code</step>
+        <step>Simplify to bare minimum</step>
+        <step>Verify it still fails</step>
+        <step>Debug the simplified version</step>
+      </steps>
+      <benefits>
+        - Easier to understand
+        - Faster to test
+        - Clearer what's causing the issue
+      </benefits>
+    </technique>
+    
+    <technique name="comparison_debugging">
+      <description>
+        Compare behavior between old and new versions
+      </description>
+      <approach>
+        <step>Create test environment with old version</step>
+        <step>Run same code and capture output</step>
+        <step>Switch to new version</step>
+        <step>Run same code and capture output</step>
+        <step>Compare outputs to identify differences</step>
+      </approach>
+      <tools>
+        <tool>diff command for text comparison</tool>
+        <tool>pdb/debugger to step through both versions</tool>
+        <tool>print statements to log intermediate values</tool>
+      </tools>
+    </technique>
+    
+    <technique name="documentation_driven_debugging">
+      <description>
+        Use package documentation to understand expected behavior
+      </description>
+      <steps>
+        <step>Find documentation for the failing function/class</step>
+        <step>Read the API documentation carefully</step>
+        <step>Check examples in documentation</step>
+        <step>Compare your usage with documented usage</step>
+        <step>Adjust your code to match documented API</step>
+      </steps>
+    </technique>
+    
+    <technique name="interactive_debugging">
+      <description>
+        Use debugger to step through code execution
+      </description>
+      <tools>
+        <python>
+          <tool>pdb - Python debugger</tool>
+          <usage>
+            import pdb; pdb.set_trace()
+            # Or use breakpoint() in Python 3.7+
+          </usage>
+          <commands>
+            <command>n - next line</command>
+            <command>s - step into function</command>
+            <command>c - continue execution</command>
+            <command>p variable - print variable value</command>
+            <command>l - list source code</command>
+          </commands>
+        </python>
+        <nodejs>
+          <tool>Node.js debugger</tool>
+          <usage>node inspect test.js</usage>
+          <tool>Chrome DevTools</tool>
+          <usage>node --inspect-brk test.js</usage>
+        </nodejs>
+        <java>
+          <tool>IDE debugger (IntelliJ, Eclipse)</tool>
+          <tool>jdb - Java debugger</tool>
+        </java>
+      </tools>
+    </technique>
+  </debugging_techniques>
+
+  <test_isolation>
+    <title>Isolating and Fixing Individual Tests</title>
+    
+    <isolation_strategy>
+      <principle>Fix one test at a time</principle>
+      <rationale>
+        - Easier to understand the specific issue
+        - Faster feedback loop
+        - Prevents confusion from multiple failures
+        - Allows incremental progress
+      </rationale>
+      
+      <workflow>
+        <step number="1">
+          <action>Identify the simplest failing test</action>
+          <criteria>
+            - Fewest dependencies
+            - Clearest error message
+            - Most isolated functionality
+          </criteria>
+        </step>
+        
+        <step number="2">
+          <action>Run only that test</action>
+          <commands>
+            <python>pytest tests/test_file.py::test_name -v</python>
+            <nodejs>npm test -- --testNamePattern="test_name"</nodejs>
+          </commands>
+        </step>
+        
+        <step number="3">
+          <action>Understand why it fails</action>
+          <analysis>
+            - Read the error message carefully
+            - Examine the stack trace
+            - Review the test code
+            - Check what's being tested
+          </analysis>
+        </step>
+        
+        <step number="4">
+          <action>Implement the fix</action>
+          <approach>
+            - Make minimal changes
+            - Focus on the specific issue
+            - Don't try to fix multiple things at once
+          </approach>
+        </step>
+        
+        <step number="5">
+          <action>Verify the fix</action>
+          <verification>
+            - Run the test again
+            - Confirm it passes
+            - Run related tests to check for regressions
+          </verification>
+        </step>
+        
+        <step number="6">
+          <action>Move to next failing test</action>
+          <details>
+            Repeat the process for the next test
+          </details>
+        </step>
+      </workflow>
+    </isolation_strategy>
+    
+    <grouping_related_failures>
+      <description>
+        Some failures have the same root cause and can be fixed together
+      </description>
+      
+      <identification>
+        <indicator>Same error message</indicator>
+        <indicator>Same failing function/module</indicator>
+        <indicator>Same stack trace pattern</indicator>
+        <indicator>Same package being used</indicator>
+      </identification>
+      
+      <approach>
+        <step>Identify the common pattern</step>
+        <step>Fix the root cause once</step>
+        <step>Verify all related tests now pass</step>
+        <step>This is more efficient than fixing each test individually</step>
+      </approach>
+      
+      <example>
+        If 10 tests fail with "ImportError: cannot import 'OldClass'",
+        fixing the import statement once will fix all 10 tests.
+      </example>
+    </grouping_related_failures>
+  </test_isolation>
+
+  <regression_prevention>
+    <title>Ensuring No New Failures</title>
+    
+    <continuous_verification>
+      <principle>Run full test suite after each fix</principle>
+      <rationale>
+        Ensure your fix doesn't break other tests
+      </rationale>
+      
+      <workflow>
+        <step>Fix a specific test</step>
+        <step>Verify that test passes</step>
+        <step>Run full test suite</step>
+        <step>Check that no new failures appeared</step>
+        <step>If new failures, investigate and fix</step>
+      </workflow>
+    </continuous_verification>
+    
+    <regression_detection>
+      <signs>
+        <sign>Tests that previously passed now fail</sign>
+        <sign>Different error messages than before</sign>
+        <sign>Failures in unrelated test files</sign>
+      </signs>
+      
+      <response>
+        <step>Identify what changed</step>
+        <step>Understand why it caused the regression</step>
+        <step>Adjust the fix to avoid the regression</step>
+        <step>Consider if a different approach is needed</step>
+      </response>
+    </regression_detection>
+  </regression_prevention>
+
+  <test_execution_checklist>
+    <title>Complete Testing Checklist</title>
+    
+    <checklist>
+      <section name="environment">
+        <item>✓ Clean environment created</item>
+        <item>✓ Correct package versions installed</item>
+        <item>✓ Dependencies verified</item>
+      </section>
+      
+      <section name="initial_run">
+        <item>✓ Full test suite executed</item>
+        <item>✓ Failure count documented</item>
+        <item>✓ Failure patterns identified</item>
+        <item>✓ Output captured for analysis</item>
+      </section>
+      
+      <section name="analysis">
+        <item>✓ Each failure categorized</item>
+        <item>✓ Root causes identified</item>
+        <item>✓ Common patterns noted</item>
+        <item>✓ Fix priority determined</item>
+      </section>
+      
+      <section name="fixing">
+        <item>✓ Tests fixed one at a time (or by group)</item>
+        <item>✓ Each fix verified individually</item>
+        <item>✓ No regressions introduced</item>
+        <item>✓ All changes documented</item>
+      </section>
+      
+      <section name="final_verification">
+        <item>✓ Full test suite passes</item>
+        <item>✓ No warnings or deprecations (if possible)</item>
+        <item>✓ Test execution time reasonable</item>
+        <item>✓ All fixes committed</item>
+      </section>
+    </checklist>
+  </test_execution_checklist>
+</testing_strategy>

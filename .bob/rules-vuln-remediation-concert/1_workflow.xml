@@ -1,0 +1,543 @@
+<vulnerability_remediation_workflow>
+  <overview>
+    This workflow guides you through the complete process of remediating failing unit tests
+    after a DevOps engineer has created a PR to fix a vulnerability (CVE patch or package upgrade).
+  </overview>
+
+  <workflow_phases>
+    <phase number="1" name="pr_discovery">
+      <title>Discover and Select PR</title>
+      <description>
+        Identify the vulnerability remediation PR that needs attention
+      </description>
+      <steps>
+        <step number="1">
+          <action>Fetch assigned PRs from GitHub</action>
+          <tool>GitHub MCP - fetch_github_issue or list PRs</tool>
+          <details>
+            When user asks "What are the GitHub PRs assigned to me?", use GitHub MCP
+            to list all pull requests where you are assigned as a reviewer or assignee.
+          </details>
+          <example_query>
+            User: "What are the GitHub PRs assigned to me?"
+            Response: Use GitHub MCP to fetch PRs and present them in a clear list
+          </example_query>
+        </step>
+        
+        <step number="2">
+          <action>Present PR options to user</action>
+          <details>
+            Display PRs with:
+            - PR number and title
+            - Author and creation date
+            - Current status (failing tests, etc.)
+            - Brief description of the vulnerability fix
+          </details>
+        </step>
+        
+        <step number="3">
+          <action>User selects PR to work on</action>
+          <details>
+            User will either:
+            - Specify PR number directly: "Review PR #123"
+            - Provide PR URL: "Review https://github.com/org/repo/pull/123"
+            - Select from the list you presented
+          </details>
+        </step>
+      </steps>
+    </phase>
+
+    <phase number="2" name="pr_analysis">
+      <title>Analyze PR and Understand Security Fix</title>
+      <description>
+        Deep dive into the PR to understand what vulnerability is being fixed
+        and what changes were made
+      </description>
+      <steps>
+        <step number="1">
+          <action>Fetch PR details via GitHub MCP</action>
+          <tool>fetch_github_issue with PR URL</tool>
+          <details>
+            Retrieve:
+            - PR description and comments
+            - Changed files list
+            - Diff of changes
+            - CI/CD test results
+            - Any linked issues or CVE references
+          </details>
+        </step>
+        
+        <step number="2">
+          <action>Identify the vulnerability being fixed</action>
+          <checklist>
+            <item>What CVE is being addressed?</item>
+            <item>Which package is being upgraded?</item>
+            <item>What is the old version and new version?</item>
+            <item>Is this a direct or transitive dependency?</item>
+            <item>What is the severity of the vulnerability?</item>
+          </checklist>
+        </step>
+        
+        <step number="3">
+          <action>Analyze the package changes</action>
+          <details>
+            Review changes in dependency files:
+            - requirements.txt (Python)
+            - package.json (Node.js)
+            - pom.xml (Java/Maven)
+            - build.gradle (Java/Gradle)
+            - Gemfile (Ruby)
+            - go.mod (Go)
+          </details>
+        </step>
+        
+        <step number="4">
+          <action>Research breaking changes</action>
+          <details>
+            Look for:
+            - Release notes of the upgraded package
+            - Migration guides between versions
+            - Deprecated APIs or methods
+            - Changed method signatures
+            - New required parameters
+            - Removed functionality
+          </details>
+          <tools>
+            <tool>read_file - Read CHANGELOG or release notes if available</tool>
+            <tool>search_files - Search for usage of the upgraded package</tool>
+          </tools>
+        </step>
+      </steps>
+    </phase>
+
+    <phase number="3" name="test_execution">
+      <title>Run Tests and Identify Failures</title>
+      <description>
+        Execute the unit test suite to see which tests are failing and why
+      </description>
+      <steps>
+        <step number="1">
+          <action>Checkout the PR branch locally</action>
+          <command_example>
+            git fetch origin pull/{PR_NUMBER}/head:pr-{PR_NUMBER}
+            git checkout pr-{PR_NUMBER}
+          </command_example>
+          <details>
+            Use execute_command tool to run git commands if needed,
+            or guide user to checkout the branch
+          </details>
+        </step>
+        
+        <step number="2">
+          <action>Install dependencies with upgraded versions</action>
+          <language_specific>
+            <python>
+              <command>pip install -r requirements.txt</command>
+              <or>python -m pip install -r requirements.txt</or>
+              <or>pip install -e .</or>
+            </python>
+            <nodejs>
+              <command>npm install</command>
+              <or>yarn install</or>
+            </nodejs>
+            <java>
+              <command>mvn clean install</command>
+              <or>gradle build</or>
+            </java>
+          </language_specific>
+        </step>
+        
+        <step number="3">
+          <action>Run the unit test suite</action>
+          <language_specific>
+            <python>
+              <command>pytest</command>
+              <or>python -m pytest</or>
+              <or>python -m unittest discover</or>
+            </python>
+            <nodejs>
+              <command>npm test</command>
+              <or>yarn test</or>
+            </nodejs>
+            <java>
+              <command>mvn test</command>
+              <or>gradle test</or>
+            </java>
+          </language_specific>
+          <details>
+            Capture the full test output including:
+            - Which tests failed
+            - Error messages and stack traces
+            - Expected vs actual behavior
+            - Any warnings or deprecation notices
+          </details>
+        </step>
+        
+        <step number="4">
+          <action>Analyze test failures</action>
+          <analysis_checklist>
+            <item>How many tests are failing?</item>
+            <item>Are failures related to the upgraded package?</item>
+            <item>What are the common error patterns?</item>
+            <item>Are there import errors?</item>
+            <item>Are there API signature mismatches?</item>
+            <item>Are there deprecation warnings?</item>
+          </analysis_checklist>
+        </step>
+      </steps>
+    </phase>
+
+    <phase number="4" name="root_cause_analysis">
+      <title>Determine Root Cause of Test Failures</title>
+      <description>
+        Investigate why tests are failing and identify what needs to be fixed
+      </description>
+      <common_failure_patterns>
+        <pattern name="import_errors">
+          <description>Module or package import paths have changed</description>
+          <example>
+            ImportError: cannot import name 'old_function' from 'package'
+          </example>
+          <solution_approach>
+            - Check package documentation for new import paths
+            - Search for renamed modules or functions
+            - Update import statements in application code
+          </solution_approach>
+        </pattern>
+        
+        <pattern name="api_signature_changes">
+          <description>Function or method signatures have changed</description>
+          <example>
+            TypeError: function() takes 2 positional arguments but 3 were given
+          </example>
+          <solution_approach>
+            - Review function documentation for new signature
+            - Check for new required parameters
+            - Check for removed or renamed parameters
+            - Update function calls throughout codebase
+          </solution_approach>
+        </pattern>
+        
+        <pattern name="deprecated_apis">
+          <description>APIs that were used are now deprecated or removed</description>
+          <example>
+            DeprecationWarning: 'old_method' is deprecated, use 'new_method' instead
+          </example>
+          <solution_approach>
+            - Find replacement APIs in documentation
+            - Update code to use new recommended methods
+            - Ensure new methods provide same functionality
+          </solution_approach>
+        </pattern>
+        
+        <pattern name="behavior_changes">
+          <description>Package behavior has changed causing different results</description>
+          <example>
+            AssertionError: Expected 'value1' but got 'value2'
+          </example>
+          <solution_approach>
+            - Review release notes for behavior changes
+            - Determine if test expectations need updating
+            - Check if application logic needs adjustment
+            - Verify security fix is not compromised
+          </solution_approach>
+        </pattern>
+        
+        <pattern name="dependency_conflicts">
+          <description>Upgraded package has conflicting dependencies</description>
+          <example>
+            ERROR: package-a requires package-b<2.0, but you have package-b 2.1
+          </example>
+          <solution_approach>
+            - Analyze dependency tree
+            - Find compatible versions
+            - May need to upgrade other packages
+            - Check for transitive dependency issues
+          </solution_approach>
+        </pattern>
+      </common_failure_patterns>
+      
+      <investigation_steps>
+        <step number="1">
+          <action>Read the failing test code</action>
+          <tool>read_file</tool>
+          <details>
+            Understand what the test is trying to verify and how it's failing
+          </details>
+        </step>
+        
+        <step number="2">
+          <action>Read the application code being tested</action>
+          <tool>read_file</tool>
+          <details>
+            Examine the code that uses the upgraded package
+          </details>
+        </step>
+        
+        <step number="3">
+          <action>Search for all usages of the upgraded package</action>
+          <tool>search_files</tool>
+          <details>
+            Find all places in the codebase that import or use the package
+          </details>
+        </step>
+        
+        <step number="4">
+          <action>Compare with package documentation</action>
+          <details>
+            Reference the package's documentation, changelog, or migration guide
+            to understand what changed between versions
+          </details>
+        </step>
+      </investigation_steps>
+    </phase>
+
+    <phase number="5" name="code_remediation">
+      <title>Implement Code Fixes</title>
+      <description>
+        Make targeted changes to fix the failing tests while maintaining the security fix
+      </description>
+      <principles>
+        <principle>Security First - Never revert or compromise the security fix</principle>
+        <principle>Minimal Changes - Only change what's necessary to fix tests</principle>
+        <principle>One Issue at a Time - Fix failures incrementally</principle>
+        <principle>Test After Each Fix - Verify each change works before moving on</principle>
+      </principles>
+      
+      <steps>
+        <step number="1">
+          <action>Prioritize fixes</action>
+          <details>
+            Start with:
+            1. Import errors (blocking other tests)
+            2. API signature changes (widespread impact)
+            3. Deprecated API usage (warnings)
+            4. Behavior changes (may need test updates)
+          </details>
+        </step>
+        
+        <step number="2">
+          <action>Implement first fix</action>
+          <tools>
+            <tool>apply_diff - For surgical edits to existing code</tool>
+            <tool>write_to_file - For complete file rewrites if needed</tool>
+          </tools>
+          <best_practices>
+            <practice>Use apply_diff for targeted changes</practice>
+            <practice>Include line numbers for accuracy</practice>
+            <practice>Make multiple changes in one diff when possible</practice>
+            <practice>Add comments explaining the fix</practice>
+          </best_practices>
+        </step>
+        
+        <step number="3">
+          <action>Run tests again</action>
+          <tool>execute_command</tool>
+          <details>
+            After each fix, run the test suite to verify:
+            - The specific test now passes
+            - No new tests are broken
+            - No regressions introduced
+          </details>
+        </step>
+        
+        <step number="4">
+          <action>Iterate until all tests pass</action>
+          <details>
+            Repeat steps 2-3 for each failing test or group of related failures.
+            Keep track of what's been fixed and what remains.
+          </details>
+        </step>
+        
+        <step number="5">
+          <action>Run full test suite</action>
+          <details>
+            Once all known failures are fixed, run the complete test suite
+            to ensure no regressions and all tests pass.
+          </details>
+        </step>
+      </steps>
+      
+      <common_fixes>
+        <fix type="import_update">
+          <before>from package import old_function</before>
+          <after>from package.new_module import old_function</after>
+        </fix>
+        
+        <fix type="api_signature">
+          <before>result = function(arg1, arg2)</before>
+          <after>result = function(arg1, arg2, new_required_arg=default_value)</after>
+        </fix>
+        
+        <fix type="deprecated_api">
+          <before>data = obj.old_method()</before>
+          <after>data = obj.new_method()  # Replaced deprecated old_method</after>
+        </fix>
+        
+        <fix type="configuration">
+          <before>config = {'option': 'value'}</before>
+          <after>config = {'option': 'value', 'new_option': 'required_value'}</after>
+        </fix>
+      </common_fixes>
+    </phase>
+
+    <phase number="6" name="validation">
+      <title>Validate and Document Fixes</title>
+      <description>
+        Ensure all fixes are correct, tests pass, and changes are well-documented
+      </description>
+      <steps>
+        <step number="1">
+          <action>Run complete test suite</action>
+          <validation_checklist>
+            <item>All unit tests pass</item>
+            <item>No new test failures introduced</item>
+            <item>No deprecation warnings (if possible)</item>
+            <item>Code compiles without errors</item>
+          </validation_checklist>
+        </step>
+        
+        <step number="2">
+          <action>Verify security fix is maintained</action>
+          <details>
+            Confirm that:
+            - The upgraded package version is still in place
+            - No workarounds that compromise security were added
+            - The CVE is actually fixed by the changes
+          </details>
+        </step>
+        
+        <step number="3">
+          <action>Document all changes</action>
+          <documentation_requirements>
+            <item>List all files modified</item>
+            <item>Explain why each change was necessary</item>
+            <item>Reference the breaking changes that caused failures</item>
+            <item>Note any potential impacts or considerations</item>
+          </documentation_requirements>
+        </step>
+        
+        <step number="4">
+          <action>Prepare summary for PR update</action>
+          <summary_template>
+            ## Unit Test Fixes for CVE-{CVE_ID}
+            
+            ### Changes Made
+            - Fixed import statements in {files}
+            - Updated API calls to match new {package} v{version} signature
+            - Replaced deprecated methods with recommended alternatives
+            
+            ### Root Cause
+            The {package} upgrade from v{old} to v{new} introduced breaking changes:
+            - {breaking_change_1}
+            - {breaking_change_2}
+            
+            ### Testing
+            - All {N} unit tests now pass
+            - No regressions introduced
+            - Security fix verified and maintained
+            
+            ### Files Modified
+            - {file1}: {reason}
+            - {file2}: {reason}
+          </summary_template>
+        </step>
+      </steps>
+    </phase>
+
+    <phase number="7" name="pr_update">
+      <title>Update PR with Fixes</title>
+      <description>
+        Commit changes and update the PR with your fixes
+      </description>
+      <steps>
+        <step number="1">
+          <action>Review all changes one final time</action>
+          <tool>obtain_git_diff</tool>
+          <details>
+            Use obtain_git_diff to see all local changes before committing
+          </details>
+        </step>
+        
+        <step number="2">
+          <action>Commit changes with clear message</action>
+          <commit_message_format>
+            fix: resolve unit test failures after {package} upgrade
+            
+            - Fixed import paths for {package} v{version}
+            - Updated API calls to match new signatures
+            - Replaced deprecated methods
+            
+            Addresses failing tests in PR #{pr_number}
+            Related to CVE-{cve_id}
+          </commit_message_format>
+        </step>
+        
+        <step number="3">
+          <action>Push changes to PR branch</action>
+          <details>
+            Guide user to push changes or use GitHub MCP if available
+          </details>
+        </step>
+        
+        <step number="4">
+          <action>Add comment to PR</action>
+          <details>
+            Post a comment on the PR explaining:
+            - What was fixed
+            - Why tests were failing
+            - That all tests now pass
+            - Any considerations for reviewers
+          </details>
+        </step>
+      </steps>
+    </phase>
+  </workflow_phases>
+
+  <success_criteria>
+    <criterion>All unit tests pass</criterion>
+    <criterion>Security fix (package upgrade) is maintained</criterion>
+    <criterion>No new regressions introduced</criterion>
+    <criterion>Changes are minimal and targeted</criterion>
+    <criterion>All changes are well-documented</criterion>
+    <criterion>PR is updated with fixes and explanation</criterion>
+  </success_criteria>
+
+  <escalation_scenarios>
+    <scenario name="cannot_fix_without_breaking_security">
+      <description>
+        Tests cannot be fixed without reverting the security patch
+      </description>
+      <action>
+        - Document the conflict clearly
+        - Explain why the security fix and tests are incompatible
+        - Recommend involving security team and package maintainers
+        - Suggest alternative approaches if any exist
+      </action>
+    </scenario>
+    
+    <scenario name="extensive_refactoring_needed">
+      <description>
+        Fixing tests requires major refactoring beyond scope
+      </description>
+      <action>
+        - Document the scope of changes needed
+        - Provide a detailed plan for the refactoring
+        - Recommend creating separate tasks for the work
+        - Suggest interim solutions if possible
+      </action>
+    </scenario>
+    
+    <scenario name="dependency_conflict_unresolvable">
+      <description>
+        Package upgrade creates dependency conflicts that can't be resolved
+      </description>
+      <action>
+        - Document the dependency conflict
+        - Analyze the dependency tree
+        - Suggest alternative package versions if available
+        - Recommend consulting with DevOps team
+      </action>
+    </scenario>
+  </escalation_scenarios>
+</vulnerability_remediation_workflow>

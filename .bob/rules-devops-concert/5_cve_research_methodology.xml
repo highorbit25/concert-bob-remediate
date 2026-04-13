@@ -1,0 +1,474 @@
+<cve_research_methodology>
+  <overview>
+    Comprehensive methodology for researching CVEs using IBM Concert API plus authoritative external sources before implementing fixes.
+    This is a CRITICAL FIRST STEP before any remediation work.
+    ALWAYS use API endpoints instead of browser-based research for automation and accuracy.
+    Concert is the required internal source of truth for application-specific exposure and package recommendations, and it must be cross-referenced with authoritative public vulnerability sources such as NVD.
+  </overview>
+
+  <research_requirements>
+    <requirement priority="critical">Always query IBM Concert API first to confirm the affected application, package exposure, and recommended remediation path.</requirement>
+    <requirement priority="critical">Always cross-reference Concert findings with at least one authoritative public source, preferably NVD.</requirement>
+    <requirement priority="high">When package version guidance is available, compare Concert recommendations against public advisory data before selecting the final target version.</requirement>
+    <requirement priority="high">If Concert and external sources disagree, document the discrepancy and prefer the safer version that is both patched and supported by available evidence.</requirement>
+    <requirement priority="medium">If Concert is temporarily unavailable, continue external research but explicitly note that Concert validation is still pending.</requirement>
+  </research_requirements>
+
+  <research_priority_order>
+    <title>Check Sources in This Order (Concert Plus Authoritative Cross-Reference)</title>
+    <source priority="1">
+      <name>IBM Concert API</name>
+      <authority>Highest for internal application context and package recommendations</authority>
+      <api_endpoints>
+        <endpoint>/concert/core/api/v1/applications</endpoint>
+        <endpoint>/concert/core/api/v1/applications/{id}/vulnerability_details</endpoint>
+        <endpoint>/concert/core/api/v1/applications/{id}/packages</endpoint>
+        <endpoint>/concert/core/api/v1/software_composition/packages/{id}</endpoint>
+        <endpoint>/concert/core/api/v1/software_composition/recommendations</endpoint>
+      </api_endpoints>
+      <method>GET</method>
+      <extract>
+        <field>Application-specific vulnerable packages</field>
+        <field>Concert severity and risk context</field>
+        <field>Package recommendation or recommended_version</field>
+        <field>Application/build artifact context for the affected package</field>
+      </extract>
+      <best_practice>Use Concert first to establish whether the target application is actually affected and what version path Concert recommends.</best_practice>
+    </source>
+    <source priority="2">
+      <name>National Vulnerability Database (NVD) API</name>
+      <authority>Highest - Official US government CVE database</authority>
+      <api_endpoint>https://services.nvd.nist.gov/rest/json/cves/2.0</api_endpoint>
+      <method>GET</method>
+      <parameters>
+        <parameter name="cveId">CVE identifier (e.g., CVE-2023-12345)</parameter>
+      </parameters>
+      <curl_example>
+curl -X GET "https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=CVE-2023-12345" \
+  -H "Accept: application/json"
+      </curl_example>
+      <extract>
+        <field>descriptions[].value - CVE description</field>
+        <field>metrics.cvssMetricV31[].cvssData.baseScore - CVSS score</field>
+        <field>metrics.cvssMetricV31[].cvssData.baseSeverity - Severity rating</field>
+        <field>weaknesses[].description[].value - CWE classification</field>
+        <field>configurations[].nodes[].cpeMatch[].criteria - Affected versions</field>
+        <field>references[] - Links to advisories and patches</field>
+      </extract>
+      <rate_limit>5 requests per 30 seconds without API key</rate_limit>
+      <best_practice>Parse JSON response to extract vulnerability details programmatically</best_practice>
+    </source>
+    
+    <source priority="3">
+      <name>GitHub Advisory Database API</name>
+      <authority>High - Aggregates security advisories from multiple sources</authority>
+      <api_endpoint>https://api.github.com/advisories</api_endpoint>
+      <method>GET</method>
+      <parameters>
+        <parameter name="cve_id">CVE identifier</parameter>
+        <parameter name="ecosystem">Package ecosystem (npm, pip, maven, etc.)</parameter>
+      </parameters>
+      <curl_example>
+curl -X GET "https://api.github.com/advisories?cve_id=CVE-2023-12345" \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28"
+      </curl_example>
+      <extract>
+        <field>summary - Brief vulnerability description</field>
+        <field>severity - Severity level (critical, high, medium, low)</field>
+        <field>cvss.score - CVSS score</field>
+        <field>vulnerabilities[].package.name - Affected package</field>
+        <field>vulnerabilities[].vulnerable_version_range - Affected versions</field>
+        <field>vulnerabilities[].patched_versions - Fixed versions</field>
+        <field>references[] - Links to advisories</field>
+      </extract>
+      <authentication>Optional GitHub token for higher rate limits</authentication>
+      <best_practice>Use ecosystem filter to narrow results to relevant packages</best_practice>
+    </source>
+
+    <source priority="4">
+      <name>Official Vendor Security Advisory APIs</name>
+      <authority>Highest for specific packages - Direct from maintainers</authority>
+      <examples>
+        <example ecosystem="npm">
+          <name>npm Registry API</name>
+          <endpoint>https://registry.npmjs.org/{package-name}</endpoint>
+          <extract>Check "versions" object for security advisories in package metadata</extract>
+        </example>
+        <example ecosystem="pypi">
+          <name>PyPI JSON API</name>
+          <endpoint>https://pypi.org/pypi/{package-name}/json</endpoint>
+          <extract>Check "vulnerabilities" field in package metadata</extract>
+        </example>
+        <example ecosystem="maven">
+          <name>Maven Central API</name>
+          <endpoint>https://search.maven.org/solrsearch/select?q=g:{groupId}+AND+a:{artifactId}</endpoint>
+          <extract>Check for security metadata in response</extract>
+        </example>
+      </examples>
+    </source>
+
+    <source priority="5">
+      <name>OSV (Open Source Vulnerabilities) API</name>
+      <authority>High - Aggregates vulnerabilities across ecosystems</authority>
+      <api_endpoint>https://api.osv.dev/v1/query</api_endpoint>
+      <method>POST</method>
+      <request_body>
+{
+  "package": {
+    "name": "package-name",
+    "ecosystem": "PyPI"
+  },
+  "version": "1.2.3"
+}
+      </request_body>
+      <curl_example>
+curl -X POST "https://api.osv.dev/v1/query" \
+  -H "Content-Type: application/json" \
+  -d '{"package":{"name":"flask","ecosystem":"PyPI"},"version":"2.0.1"}'
+      </curl_example>
+      <extract>
+        <field>vulns[].id - Vulnerability ID (CVE or GHSA)</field>
+        <field>vulns[].summary - Vulnerability description</field>
+        <field>vulns[].severity[].score - CVSS score</field>
+        <field>vulns[].affected[].ranges - Affected version ranges</field>
+        <field>vulns[].affected[].versions - Specific affected versions</field>
+        <field>vulns[].references[] - Links to advisories</field>
+      </extract>
+      <best_practice>Query by package name and version for precise results</best_practice>
+    </source>
+
+    <source priority="6">
+      <name>Snyk Vulnerability Database API</name>
+      <authority>Medium - Commercial security intelligence</authority>
+      <api_endpoint>https://api.snyk.io/v1/vuln/{ecosystem}/{package-name}</api_endpoint>
+      <method>GET</method>
+      <authentication>Requires Snyk API token</authentication>
+      <curl_example>
+curl -X GET "https://api.snyk.io/v1/vuln/npm/express" \
+  -H "Authorization: token YOUR_SNYK_TOKEN"
+      </curl_example>
+      <extract>
+        <field>vulnerabilities[].id - Snyk vulnerability ID</field>
+        <field>vulnerabilities[].title - Vulnerability title</field>
+        <field>vulnerabilities[].severity - Severity level</field>
+        <field>vulnerabilities[].semver.vulnerable - Affected versions</field>
+        <field>vulnerabilities[].patches - Available patches</field>
+      </extract>
+      <note>Requires paid Snyk account for full API access</note>
+    </source>
+
+    <source priority="7">
+      <name>MITRE CVE API</name>
+      <authority>High - Original CVE numbering authority</authority>
+      <api_endpoint>https://cveawg.mitre.org/api/cve/{CVE-ID}</api_endpoint>
+      <method>GET</method>
+      <curl_example>
+curl -X GET "https://cveawg.mitre.org/api/cve/CVE-2023-12345" \
+  -H "Accept: application/json"
+      </curl_example>
+      <extract>
+        <field>containers.cna.descriptions[] - CVE description</field>
+        <field>containers.cna.affected[] - Affected products/versions</field>
+        <field>containers.cna.references[] - Reference links</field>
+      </extract>
+      <best_practice>Use as fallback if NVD API is unavailable</best_practice>
+    </source>
+  </research_priority_order>
+
+  <required_information_to_extract>
+    <title>Information You MUST Gather</title>
+    <information priority="critical">
+      <field>CVE ID and Description</field>
+      <question>What is the vulnerability?</question>
+    </information>
+    <information priority="critical">
+      <field>Vulnerability Type</field>
+      <question>RCE, XSS, SQL Injection, SSRF, Configuration issue, etc.?</question>
+    </information>
+    <information priority="critical">
+      <field>Attack Vector</field>
+      <question>How can it be exploited?</question>
+    </information>
+    <information priority="high">
+      <field>CVSS Score</field>
+      <question>Severity rating (0-10)?</question>
+    </information>
+    <information priority="high">
+      <field>CWE Classification</field>
+      <question>Common Weakness Enumeration number?</question>
+    </information>
+    <information priority="critical">
+      <field>Affected Versions</field>
+      <question>Exact version ranges affected?</question>
+    </information>
+    <information priority="critical">
+      <field>Patched Versions</field>
+      <question>Which versions contain the fix?</question>
+    </information>
+    <information priority="medium">
+      <field>Workarounds</field>
+      <question>Any temporary mitigations available?</question>
+    </information>
+    <information priority="high">
+      <field>Root Cause</field>
+      <question>What causes the vulnerability?</question>
+    </information>
+    <information priority="medium">
+      <field>Proof of Concept</field>
+      <question>Is there a known exploit?</question>
+    </information>
+  </required_information_to_extract>
+
+  <vulnerability_category_determination>
+    <title>Determine Category and Fix Strategy</title>
+    
+    <category name="dependency_vulnerability">
+      <indicators>
+        <indicator>CVE mentions package name and version</indicator>
+        <indicator>Issue describes outdated library</indicator>
+        <indicator>Transitive dependency mentioned</indicator>
+      </indicators>
+      <research_focus>
+        <focus>Official package security advisory</focus>
+        <focus>NVD entry for the CVE</focus>
+        <focus>Package changelog for patched version</focus>
+      </research_focus>
+      <fix_strategy>
+        Upgrade to patched version specified in advisory
+      </fix_strategy>
+      <example>
+        CVE-2025-55182 in Next.js 16.0.6 → Upgrade to 16.0.7
+      </example>
+    </category>
+
+    <category name="code_pattern_vulnerability">
+      <indicators>
+        <indicator>CVE describes coding practice (SQLi, XSS, etc.)</indicator>
+        <indicator>Issue mentions insecure code patterns</indicator>
+        <indicator>Vulnerability in application logic</indicator>
+      </indicators>
+      <research_focus>
+        <focus>OWASP guidelines for the vulnerability type</focus>
+        <focus>CWE documentation</focus>
+        <focus>Secure coding patterns for the language/framework</focus>
+      </research_focus>
+      <fix_strategy>
+        Refactor code to use secure alternatives
+      </fix_strategy>
+      <examples>
+        <example type="sql_injection">Use parameterized queries/ORMs</example>
+        <example type="xss">Sanitize output, use Content Security Policy</example>
+        <example type="command_injection">Avoid shell execution, use safe APIs</example>
+        <example type="path_traversal">Validate and sanitize file paths</example>
+        <example type="insecure_deserialization">Use safe serialization formats</example>
+      </examples>
+    </category>
+
+    <category name="configuration_vulnerability">
+      <indicators>
+        <indicator>CVE mentions configuration, secrets, or settings</indicator>
+        <indicator>Issue describes exposed credentials</indicator>
+        <indicator>Weak security settings mentioned</indicator>
+      </indicators>
+      <research_focus>
+        <focus>Security best practices for the framework</focus>
+        <focus>Framework documentation on secure configuration</focus>
+        <focus>Industry standards for the configuration type</focus>
+      </research_focus>
+      <fix_strategy>
+        Update configuration with secure defaults
+      </fix_strategy>
+      <examples>
+        <example type="hardcoded_secrets">Move to environment variables, use secret managers</example>
+        <example type="weak_crypto">Use strong algorithms (AES-256, SHA-256)</example>
+        <example type="permissive_cors">Restrict origins to trusted domains</example>
+        <example type="missing_headers">Add security headers (CSP, HSTS, X-Frame-Options)</example>
+      </examples>
+    </category>
+
+    <category name="infrastructure_vulnerability">
+      <indicators>
+        <indicator>CVE mentions Docker, Kubernetes, deployment</indicator>
+        <indicator>Issue describes container or infrastructure issue</indicator>
+        <indicator>Deployment configuration vulnerability</indicator>
+      </indicators>
+      <research_focus>
+        <focus>Container security guidelines</focus>
+        <focus>Official image advisories</focus>
+        <focus>Kubernetes security best practices</focus>
+      </research_focus>
+      <fix_strategy>
+        Update infrastructure configuration
+      </fix_strategy>
+      <examples>
+        <example type="vulnerable_base_image">Update to patched image version</example>
+        <example type="root_container">Run as non-root user</example>
+        <example type="exposed_ports">Restrict network access</example>
+        <example type="missing_security_context">Add security policies</example>
+      </examples>
+    </category>
+  </vulnerability_category_determination>
+
+  <cross_reference_validation>
+    <title>CRITICAL: Always Verify Across Multiple Sources Using APIs</title>
+    <important_note>
+      ALWAYS use API endpoints for CVE research instead of browser-based manual research.
+      See 7_api_based_cve_research.xml for detailed API usage instructions and examples.
+    </important_note>
+    <steps>
+      <step number="1">Query NVD API for official CVE details</step>
+      <step number="2">Query GitHub Advisory Database API for package-specific information</step>
+      <step number="3">Query OSV API for cross-ecosystem vulnerability data</step>
+      <step number="4">Validate that all API responses are consistent</step>
+      <step number="5">Document all API queries and responses</step>
+    </steps>
+    <rationale>
+      API-based research is faster, more accurate, and automatable compared to manual browser research.
+      Different sources may have conflicting or incomplete information.
+      Cross-referencing multiple APIs ensures you have accurate, complete data.
+    </rationale>
+    <reference>
+      For complete API usage guide with examples, see: 7_api_based_cve_research.xml
+    </reference>
+  </cross_reference_validation>
+
+  <research_documentation_template>
+    <title>Document Your Research</title>
+    <template>
+      <![CDATA[
+## CVE Research: {CVE-ID}
+
+### Official Sources Consulted:
+- NVD: https://nvd.nist.gov/vuln/detail/{CVE-ID}
+- Vendor Advisory: {URL}
+- Security Database: {URL}
+- OWASP Reference: {URL if applicable}
+- Package Changelog: {URL}
+
+### Findings:
+- **Type**: {RCE/XSS/SQLi/Config/etc.}
+- **Category**: {Dependency/Code/Configuration/Infrastructure}
+- **Affected**: {version range or code pattern}
+- **Patched**: {fixed versions or secure pattern}
+- **Attack Vector**: {description}
+- **Severity**: {CRITICAL/HIGH/MEDIUM/LOW}
+- **CVSS**: {score}
+- **CWE**: {CWE-XXX}
+- **Root Cause**: {technical explanation}
+
+### Recommended Fix:
+{Based on official advisories and security best practices}
+
+### Compatibility Considerations:
+- Current version: {current_version}
+- Recommended version: {patched_version}
+- Version jump: {patch/minor/major}
+- Breaking changes: {YES/NO with details}
+- Migration required: {YES/NO with steps}
+      ]]>
+    </template>
+  </research_documentation_template>
+
+  <research_workflow_example>
+    <title>Example: CVE-2025-55182 Research</title>
+    <step number="1">
+      <action>Check NVD</action>
+      <url>https://nvd.nist.gov/vuln/detail/CVE-2025-55182</url>
+      <findings>
+        <finding>Type: Remote Code Execution (RCE)</finding>
+        <finding>Affected: React Server Components 19.0.0-19.2.0</finding>
+        <finding>Also affects: Next.js 15.x, 16.0.0-16.0.6</finding>
+        <finding>CVSS: 9.8 (Critical)</finding>
+      </findings>
+    </step>
+    <step number="2">
+      <action>Check Next.js Security Advisory</action>
+      <url>https://nextjs.org/blog/CVE-2025-66478</url>
+      <findings>
+        <finding>Patched in: Next.js 16.0.7</finding>
+        <finding>Recommendation: Upgrade to 16.0.7 or later</finding>
+        <finding>No breaking changes in patch version</finding>
+      </findings>
+    </step>
+    <step number="3">
+      <action>Check React Advisory</action>
+      <url>https://react.dev/blog/2025/12/03/...</url>
+      <findings>
+        <finding>Root cause: Unsafe deserialization in RSC Flight protocol</finding>
+        <finding>Patched in: React 19.2.1</finding>
+        <finding>Note: Next.js fix is sufficient</finding>
+      </findings>
+    </step>
+    <step number="4">
+      <action>Decision</action>
+      <conclusion>
+        Upgrade next from 16.0.6 to 16.0.7 (patch bump, no breaking changes)
+      </conclusion>
+    </step>
+  </research_workflow_example>
+
+  <common_mistakes_to_avoid>
+    <mistake name="using_browser_instead_of_apis">
+      <description>Manually browsing websites instead of using APIs for CVE research</description>
+      <why_wrong>Manual browser research is slow, error-prone, not automatable, and inconsistent</why_wrong>
+      <correct_approach>Always use API endpoints (NVD, GitHub Advisory, OSV) - see 7_api_based_cve_research.xml</correct_approach>
+    </mistake>
+
+    <mistake name="relying_only_on_repository">
+      <description>Using only repository documentation without checking official CVE sources</description>
+      <why_wrong>Repository docs may be outdated or incorrect</why_wrong>
+      <correct_approach>Always verify with official CVE API databases first</correct_approach>
+    </mistake>
+
+    <mistake name="assuming_generic_patterns">
+      <description>Assuming all dependency CVEs are fixed by simple upgrades</description>
+      <why_wrong>Some require code changes or configuration updates</why_wrong>
+      <correct_approach>Always check official advisory for specific guidance</correct_approach>
+    </mistake>
+
+    <mistake name="ignoring_compatibility">
+      <description>Not checking if official fix works with current environment</description>
+      <why_wrong>Official fix may not be compatible with current dependencies</why_wrong>
+      <correct_approach>Must validate compatibility before implementing</correct_approach>
+    </mistake>
+
+    <mistake name="not_understanding_vulnerability">
+      <description>Applying fixes without understanding why</description>
+      <why_wrong>May miss edge cases or introduce new issues</why_wrong>
+      <correct_approach>Always research the root cause and attack vector</correct_approach>
+    </mistake>
+  </common_mistakes_to_avoid>
+
+  <red_flags_requiring_clarification>
+    <title>STOP and Seek Clarification If:</title>
+    <red_flag>Official advisory conflicts with repository documentation</red_flag>
+    <red_flag>Patched version incompatible with current dependencies</red_flag>
+    <red_flag>Multiple conflicting fix recommendations from different sources</red_flag>
+    <red_flag>No clear patched version specified in advisories</red_flag>
+    <red_flag>Fix requires extensive code refactoring without clear guidance</red_flag>
+    <red_flag>Downgrade seems necessary (very rare, usually wrong)</red_flag>
+    <red_flag>Security fix introduces new vulnerabilities</red_flag>
+  </red_flags_requiring_clarification>
+
+  <validation_checklist>
+    <title>Before Implementing ANY Fix</title>
+    <checklist>
+      <item>✅ Researched CVE using APIs (NVD API, GitHub Advisory API, OSV API)</item>
+      <item>✅ Documented all API queries and responses</item>
+      <item>✅ Identified exact vulnerability type and category</item>
+      <item>✅ Found official patched version or secure coding pattern</item>
+      <item>✅ Cross-referenced information across multiple API sources</item>
+      <item>✅ Validated that all APIs return consistent information</item>
+      <item>✅ Validated fix compatibility with current repository state</item>
+      <item>✅ Checked for breaking changes and migration requirements</item>
+      <item>✅ Identified all breaking changes in the fix</item>
+      <item>✅ Documented all research sources and decision rationale</item>
+    </checklist>
+    <reference>
+      See 7_api_based_cve_research.xml for API usage examples and automation scripts
+    </reference>
+  </validation_checklist>
+</cve_research_methodology>
+
+<!-- Made with Bob -->

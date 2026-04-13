@@ -1,0 +1,383 @@
+<api_based_cve_research>
+  <overview>
+    Practical guide for using APIs to research CVEs instead of manual browser-based research.
+    This approach is faster, more accurate, and automatable for DevOps workflows.
+    IBM Concert API must be used first for application-specific exposure and package recommendations, then cross-referenced with authoritative public sources.
+  </overview>
+
+  <api_research_workflow>
+    <title>Step-by-Step API Research Process</title>
+    
+    <step number="1">
+      <name>Query IBM Concert API First</name>
+      <purpose>Confirm whether the target application and package are affected, and capture Concert's remediation guidance</purpose>
+      <command>
+source .env && curl -kX GET \
+  -H "Authorization: ${CONCERT_API_KEY}" \
+  -H "InstanceId: ${CONCERT_INSTANCE_ID}" \
+  "${CONCERT_HOSTNAME}/concert/core/api/v1/applications"
+      </command>
+      <follow_up_commands>
+source .env && curl -kX GET \
+  -H "Authorization: ${CONCERT_API_KEY}" \
+  -H "InstanceId: ${CONCERT_INSTANCE_ID}" \
+  "${CONCERT_HOSTNAME}/concert/core/api/v1/applications/{id}/vulnerability_details"
+
+source .env && curl -kX GET \
+  -H "Authorization: ${CONCERT_API_KEY}" \
+  -H "InstanceId: ${CONCERT_INSTANCE_ID}" \
+  "${CONCERT_HOSTNAME}/concert/core/api/v1/software_composition/recommendations?package_name=package-name"
+      </follow_up_commands>
+      <extract>
+        <field>Affected application and package context</field>
+        <field>Concert severity or risk information</field>
+        <field>Recommended package version or remediation path</field>
+        <field>Evidence that the package is relevant to the current application</field>
+      </extract>
+      <note>Concert is mandatory for internal remediation context and recommendation gathering.</note>
+    </step>
+
+    <step number="2">
+      <name>Query NVD API for CVE Details</name>
+      <purpose>Get official CVE information from the US government database and validate Concert findings</purpose>
+      <command>
+curl -X GET "https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=CVE-YYYY-XXXXX" \
+  -H "Accept: application/json"
+      </command>
+      <parse_with_jq>
+# Extract key information
+curl -X GET "https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=CVE-2023-12345" \
+  -H "Accept: application/json" | jq '{
+    cve_id: .vulnerabilities[0].cve.id,
+    description: .vulnerabilities[0].cve.descriptions[0].value,
+    cvss_score: .vulnerabilities[0].cve.metrics.cvssMetricV31[0].cvssData.baseScore,
+    severity: .vulnerabilities[0].cve.metrics.cvssMetricV31[0].cvssData.baseSeverity,
+    cwe: .vulnerabilities[0].cve.weaknesses[0].description[0].value
+  }'
+      </parse_with_jq>
+      <extract>
+        <field>CVE description</field>
+        <field>CVSS score and severity</field>
+        <field>CWE classification</field>
+        <field>References to advisories</field>
+      </extract>
+      <rate_limit>5 requests per 30 seconds without API key</rate_limit>
+    </step>
+
+    <step number="3">
+      <name>Query GitHub Advisory Database</name>
+      <purpose>Get package-specific vulnerability information</purpose>
+      <command>
+curl -X GET "https://api.github.com/advisories?cve_id=CVE-YYYY-XXXXX" \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28"
+      </command>
+      <parse_with_jq>
+# Extract affected packages and versions
+curl -X GET "https://api.github.com/advisories?cve_id=CVE-2023-12345" \
+  -H "Accept: application/vnd.github+json" | jq '.[] | {
+    package: .vulnerabilities[0].package.name,
+    ecosystem: .vulnerabilities[0].package.ecosystem,
+    vulnerable_range: .vulnerabilities[0].vulnerable_version_range,
+    patched_versions: .vulnerabilities[0].patched_versions,
+    severity: .severity
+  }'
+      </parse_with_jq>
+      <extract>
+        <field>Affected package name</field>
+        <field>Package ecosystem (npm, pip, maven, etc.)</field>
+        <field>Vulnerable version range</field>
+        <field>Patched versions</field>
+      </extract>
+      <authentication>Optional: Use GitHub token for higher rate limits</authentication>
+    </step>
+
+    <step number="4">
+      <name>Query OSV API for Cross-Ecosystem Data</name>
+      <purpose>Get vulnerability data across multiple ecosystems</purpose>
+      <command>
+curl -X POST "https://api.osv.dev/v1/query" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "package": {
+      "name": "package-name",
+      "ecosystem": "PyPI"
+    },
+    "version": "1.2.3"
+  }'
+      </command>
+      <parse_with_jq>
+# Extract vulnerability details and filter by CVE ID
+curl -X POST "https://api.osv.dev/v1/query" \
+  -H "Content-Type: application/json" \
+  -d '{"package":{"name":"flask","ecosystem":"PyPI"},"version":"2.3.0"}' | \
+  jq '.vulns[] | select(.aliases[]? | contains("CVE-2023-30861")) | {
+    id: .id,
+    aliases: .aliases,
+    summary: .summary
+  }'
+
+# Or get details of a specific vulnerability by ID
+curl -X GET "https://api.osv.dev/v1/vulns/PYSEC-2023-62" | jq '{
+  id: .id,
+  aliases: .aliases,
+  summary: .summary,
+  affected: .affected[0].ranges[0]
+}'
+      </parse_with_jq>
+      <extract>
+        <field>Vulnerability ID (PYSEC, GHSA, etc.)</field>
+        <field>CVE aliases</field>
+        <field>Summary description</field>
+        <field>Affected version ranges</field>
+      </extract>
+      <note>
+        OSV API returns all vulnerabilities for a package/version.
+        Filter results by CVE ID using jq or query specific vulnerability IDs directly.
+      </note>
+    </step>
+
+    <step number="5">
+      <name>Validate Concert Against External Sources</name>
+      <purpose>Ensure consistency and accuracy before choosing the remediation version</purpose>
+      <validation_checklist>
+        <item>✅ Concert confirms the affected application/package relationship</item>
+        <item>✅ NVD confirms the same CVE and severity context</item>
+        <item>✅ GitHub Advisory and/or OSV confirm affected version ranges</item>
+        <item>✅ Concert recommendation is compared against patched versions from public sources</item>
+        <item>✅ Any discrepancy is documented explicitly in the remediation notes or PR</item>
+      </validation_checklist>
+    </step>
+  </api_research_workflow>
+
+  <practical_examples>
+    <example name="python_flask_vulnerability">
+      <scenario>Research CVE affecting Flask package</scenario>
+      <commands>
+# Step 1: NVD API
+curl -X GET "https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=CVE-2023-30861" \
+  -H "Accept: application/json" | jq '.vulnerabilities[0].cve | {
+    description: .descriptions[0].value,
+    cvss: .metrics.cvssMetricV31[0].cvssData.baseScore,
+    severity: .metrics.cvssMetricV31[0].cvssData.baseSeverity
+  }'
+
+# Step 2: GitHub Advisory
+curl -X GET "https://api.github.com/advisories?cve_id=CVE-2023-30861" \
+  -H "Accept: application/vnd.github+json" | jq '.[0] | {
+    package: .vulnerabilities[0].package.name,
+    vulnerable: .vulnerabilities[0].vulnerable_version_range,
+    patched: .vulnerabilities[0].patched_versions
+  }'
+
+# Step 3: OSV API
+curl -X POST "https://api.osv.dev/v1/query" \
+  -H "Content-Type: application/json" \
+  -d '{"package":{"name":"flask","ecosystem":"PyPI"},"version":"2.2.0"}' | jq '.vulns[] | select(.id | contains("CVE-2023-30861"))'
+      </commands>
+      <expected_output>
+        <nvd>CVSS 7.5 (High), Cookie parsing vulnerability</nvd>
+        <github>flask, vulnerable: <2.2.5 || >=2.3.0,<2.3.2, patched: 2.2.5, 2.3.2</github>
+        <osv>Confirms same version ranges and fix versions</osv>
+      </expected_output>
+    </example>
+
+    <example name="nodejs_express_vulnerability">
+      <scenario>Research CVE affecting Express.js</scenario>
+      <commands>
+# Combined query with jq filtering
+CVE_ID="CVE-2024-29041"
+
+# NVD
+curl -s "https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=${CVE_ID}" | \
+  jq -r '.vulnerabilities[0].cve.descriptions[0].value'
+
+# GitHub Advisory
+curl -s "https://api.github.com/advisories?cve_id=${CVE_ID}" \
+  -H "Accept: application/vnd.github+json" | \
+  jq '.[0].vulnerabilities[0] | "Package: \(.package.name), Vulnerable: \(.vulnerable_version_range), Fixed: \(.patched_versions)"'
+      </commands>
+    </example>
+  </practical_examples>
+
+  <api_response_documentation_template>
+    <title>Document API Research Results</title>
+    <template>
+## CVE Research: {CVE-ID} (API-Based)
+
+### API Queries Executed
+
+#### 1. IBM Concert API Query
+```bash
+source .env && curl -kX GET \
+  -H "Authorization: ${CONCERT_API_KEY}" \
+  -H "InstanceId: ${CONCERT_INSTANCE_ID}" \
+  "${CONCERT_HOSTNAME}/concert/core/api/v1/software_composition/recommendations?package_name={package}"
+```
+
+**Response Summary:**
+- Application: {application name}
+- Package: {package name}
+- Current Version: {current version}
+- Concert Recommended Version: {concert recommended version}
+- Concert Risk Context: {concert risk summary}
+
+#### 2. NVD API Query
+```bash
+curl -X GET "https://services.nvd.nist.gov/rest/json/cves/2.0?cveId={CVE-ID}" \
+  -H "Accept: application/json"
+```
+
+**Response Summary:**
+- Description: {description from API}
+- CVSS Score: {score}
+- Severity: {severity}
+- CWE: {cwe classification}
+
+#### 3. GitHub Advisory API Query
+```bash
+curl -X GET "https://api.github.com/advisories?cve_id={CVE-ID}" \
+  -H "Accept: application/vnd.github+json"
+```
+
+**Response Summary:**
+- Package: {package name}
+- Ecosystem: {npm/pip/maven/etc}
+- Vulnerable Versions: {version range}
+- Patched Versions: {fixed versions}
+
+#### 4. OSV API Query
+```bash
+curl -X POST "https://api.osv.dev/v1/query" \
+  -H "Content-Type: application/json" \
+  -d '{"package":{"name":"{package}","ecosystem":"{ecosystem}"}}'
+```
+
+**Response Summary:**
+- Vulnerability ID: {id}
+- Affected Ranges: {ranges}
+- Fixed Versions: {versions}
+
+### Cross-Validation Results
+- ✅ Concert confirms application/package relevance
+- ✅ NVD confirms CVE-{ID}
+- ✅ External sources confirm affected versions
+- ✅ Final fix version is justified against Concert and public advisory data
+- ✅ Discrepancies documented: {YES/NO}
+
+### Recommended Action
+Based on Concert, NVD, GitHub Advisory, and OSV:
+- Upgrade {package} from {current_version} to {patched_version}
+- Concert recommendation: {concert recommended version}
+- External validation result: {matches|differs}
+- Version jump: {patch/minor/major}
+- Breaking changes: {YES/NO based on changelog}
+    </template>
+  </api_response_documentation_template>
+
+  <automation_tips>
+    <tip>
+      <title>Create a Shell Script for Repeated Research</title>
+      <script>
+#!/bin/bash
+# cve_research.sh - Automated CVE research using APIs
+
+CVE_ID=$1
+
+if [ -z "$CVE_ID" ]; then
+  echo "Usage: ./cve_research.sh CVE-YYYY-XXXXX"
+  exit 1
+fi
+
+echo "=== Researching $CVE_ID ==="
+echo
+
+echo "1. NVD API:"
+curl -s "https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=${CVE_ID}" | \
+  jq '.vulnerabilities[0].cve | {
+    description: .descriptions[0].value,
+    cvss: .metrics.cvssMetricV31[0].cvssData.baseScore,
+    severity: .metrics.cvssMetricV31[0].cvssData.baseSeverity
+  }'
+
+echo
+echo "2. GitHub Advisory:"
+curl -s "https://api.github.com/advisories?cve_id=${CVE_ID}" \
+  -H "Accept: application/vnd.github+json" | \
+  jq '.[0] | {
+    package: .vulnerabilities[0].package.name,
+    vulnerable: .vulnerabilities[0].vulnerable_version_range,
+    patched: .vulnerabilities[0].patched_versions
+  }'
+      </script>
+    </tip>
+
+    <tip>
+      <title>Use Environment Variables for API Keys</title>
+      <example>
+# For GitHub API with authentication
+export GITHUB_TOKEN="your_token_here"
+
+curl -X GET "https://api.github.com/advisories?cve_id=CVE-2023-12345" \
+  -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+  -H "Accept: application/vnd.github+json"
+      </example>
+    </tip>
+
+    <tip>
+      <title>Cache API Responses to Avoid Rate Limits</title>
+      <example>
+# Cache NVD response
+CVE_ID="CVE-2023-12345"
+CACHE_FILE="/tmp/nvd_${CVE_ID}.json"
+
+if [ ! -f "$CACHE_FILE" ]; then
+  curl -s "https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=${CVE_ID}" > "$CACHE_FILE"
+fi
+
+jq '.vulnerabilities[0].cve' "$CACHE_FILE"
+      </example>
+    </tip>
+  </automation_tips>
+
+  <error_handling>
+    <error type="rate_limit_exceeded">
+      <api>NVD API</api>
+      <symptom>HTTP 429 Too Many Requests</symptom>
+      <solution>Wait 30 seconds between requests, or use API key for higher limits</solution>
+      <workaround>Use cached responses or switch to GitHub Advisory API</workaround>
+    </error>
+
+    <error type="cve_not_found">
+      <symptom>Empty response or 404</symptom>
+      <solution>Verify CVE ID format (CVE-YYYY-XXXXX), check if CVE is recently published</solution>
+      <workaround>Try alternative APIs (OSV, MITRE) or wait for database sync</workaround>
+    </error>
+
+    <error type="api_unavailable">
+      <symptom>Connection timeout or 5xx errors</symptom>
+      <solution>Retry with exponential backoff</solution>
+      <workaround>Use alternative API sources or fallback to manual research</workaround>
+    </error>
+  </error_handling>
+
+  <best_practices>
+    <practice priority="high">
+      Always query multiple APIs to cross-validate information
+    </practice>
+    <practice priority="high">
+      Use jq to parse JSON responses for clean, structured output
+    </practice>
+    <practice priority="medium">
+      Cache API responses to avoid hitting rate limits
+    </practice>
+    <practice priority="medium">
+      Create reusable scripts for common CVE research patterns
+    </practice>
+    <practice priority="low">
+      Document all API queries and responses in PR descriptions
+    </practice>
+  </best_practices>
+</api_based_cve_research>
+
+<!-- Made with Bob -->
