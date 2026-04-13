@@ -1,0 +1,78 @@
+name: PR Test and Auto-Assign
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+
+jobs:
+  test-and-assign:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        working-directory: app/vulnerable
+        run: pip install -r requirements.txt
+
+      - name: Run unit tests
+        id: run-tests
+        working-directory: app/vulnerable
+        run: python -m unittest test_main.py -v
+        continue-on-error: true
+
+      - name: Assign reviewers based on test results
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const testsPassed = ${{ steps.run-tests.outcome == 'success' }};
+            const prNumber = context.payload.pull_request.number;
+            
+            if (testsPassed) {
+              // Tests passed - assign to Software Lead for code review
+              console.log('✅ Tests passed - assigning to Software Lead');
+              await github.rest.issues.addAssignees({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                assignees: ['swe-lead']
+              });
+              
+              // Add success comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: '✅ **Unit tests passed!** Assigned to @swe-lead for code review and approval.'
+              });
+            } else {
+              // Tests failed - assign to SWE for resolution
+              console.log('❌ Tests failed - assigning to SWE');
+              await github.rest.issues.addAssignees({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                assignees: ['swe-user']
+              });
+              
+              // Add failure comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: '❌ **Unit tests failed!** Assigned to @swe-user to resolve test failures. Please check the workflow logs for details.'
+              });
+            }
+
+      - name: Set final status
+        if: steps.run-tests.outcome == 'failure'
+        run: exit 1
