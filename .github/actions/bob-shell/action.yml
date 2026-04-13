@@ -77,7 +77,7 @@ runs:
             echo "${SETTINGS}" > ".bob/settings.json"
           fi
           if [[ "${MCP:-}" ]]; then
-            mkdir -p "${HOME}/.bob"
+            mkdir -p "${HOME}/.bob/settings"
             echo "Configuring Bob Shell MCP settings in global context."
             echo "${MCP}" > "${HOME}/.bob/settings/mcp_settings.json"
           fi
