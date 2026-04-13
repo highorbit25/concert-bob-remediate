@@ -103,7 +103,6 @@ jobs:
             
             IMPORTANT: Only update package manifest files. Do NOT modify application code or tests.
           settings: ${{ vars.BOBSHELL_SETTINGS }}
-          github-token: ${{ secrets.GH_TOKEN }}
       
       - name: Validate PR Creation
         id: validate-pr
