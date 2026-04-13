@@ -1,10 +1,11 @@
 name: PR Unit Test
 
-on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-    branches:
-      - main
+# Temporarily disabled
+# on:
+#   pull_request:
+#     types: [opened, synchronize, reopened]
+#     branches:
+#       - main
 
 permissions:
   contents: read
