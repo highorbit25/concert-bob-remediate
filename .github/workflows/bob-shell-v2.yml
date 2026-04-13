@@ -103,25 +103,38 @@ jobs:
             
             IMPORTANT: Only update package manifest files. Do NOT modify application code or tests.
           settings: ${{ vars.BOBSHELL_SETTINGS }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Extract PR Information
         id: extract-pr
         run: |
           # Extract PR number from Bob's output
-          PR_NUM=$(echo "${{ steps.bob-devops.outputs.summary }}" | grep -oP 'PR #\K\d+' | head -1)
+          BOB_OUTPUT="${{ steps.bob-devops.outputs.summary }}"
+          echo "Bob output: ${BOB_OUTPUT}"
+          
+          # Try to extract PR number using multiple patterns
+          PR_NUM=$(echo "${BOB_OUTPUT}" | grep -oP 'PR #\K\d+' | head -1)
+          
+          # If that fails, try alternative pattern
           if [[ -z "$PR_NUM" ]]; then
-            echo "❌ Failed to extract PR number from Bob output"
+            PR_NUM=$(echo "${BOB_OUTPUT}" | grep -oP 'pull/\K\d+' | head -1)
+          fi
+          
+          if [[ -z "$PR_NUM" ]]; then
+            echo "❌ Failed to find PR number"
+            echo "Bob output was: ${BOB_OUTPUT}"
             exit 1
           fi
+          
           echo "pr_number=${PR_NUM}" >> $GITHUB_OUTPUT
-          echo "✅ Created PR #${PR_NUM}"
+          echo "✅ Found PR #${PR_NUM}"
           
           # Get PR branch name
-          PR_BRANCH=$(gh pr view ${PR_NUM} --json headRefName -q .headRefName)
+          PR_BRANCH=$(gh pr view "${PR_NUM}" --json headRefName -q .headRefName)
           echo "pr_branch=${PR_BRANCH}" >> $GITHUB_OUTPUT
           echo "✅ PR Branch: ${PR_BRANCH}"
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Add Approval Request Comment
         uses: actions/github-script@v7
