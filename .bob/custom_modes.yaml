@@ -364,5 +364,6 @@ customModes:
       - read
       - edit
       - command
-      - mcp
+      - - mcp
+        - serverName: github
       - browser
