@@ -101,8 +101,7 @@ customModes:
       - read
       - edit
       - command
-      - - mcp
-        - serverName: github
+      - mcp
     source: project
   - slug: devops-concert
     name: 🔧 DevOps Concert
@@ -364,8 +363,7 @@ customModes:
       - read
       - edit
       - command
-      - - mcp
-        - serverName: github
+      - mcp
       - browser
   - slug: devops-concert-shell
     name: 🔧 DevOps Concert Shell

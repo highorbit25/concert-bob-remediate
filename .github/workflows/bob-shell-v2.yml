@@ -151,7 +151,7 @@ jobs:
           bobshell_api_key: ${{ secrets.BOBSHELL_API_KEY }}
           bobshell_debug: true
           mcp: ${{ secrets.BOBSHELL_MCP_CONFIG }}
-          chat_mode: devops-concert-shell
+          chat_mode: devops-concert
           prompt: |
             Process GitHub issue #${{ steps.get-issue.outputs.issue_number }}.
             
