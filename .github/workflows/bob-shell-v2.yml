@@ -247,7 +247,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const prNumber = ${{ steps.extract-pr.outputs.pr_number }};
+            const prNumber = ${{ steps.bob-devops.outputs.pr_number }};
             await github.rest.issues.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
