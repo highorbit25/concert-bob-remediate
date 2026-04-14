@@ -330,8 +330,12 @@ jobs:
         id: run-tests
         working-directory: app/vulnerable
         run: |
+          set +e
           python -m unittest test_main.py -v
-          if [[ $? -eq 0 ]]; then
+          TEST_EXIT_CODE=$?
+          set -e
+          
+          if [[ $TEST_EXIT_CODE -eq 0 ]]; then
             echo "tests_passed=true" >> $GITHUB_OUTPUT
           else
             echo "tests_passed=false" >> $GITHUB_OUTPUT
