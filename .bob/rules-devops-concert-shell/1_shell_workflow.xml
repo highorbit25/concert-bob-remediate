@@ -1,0 +1,148 @@
+<shell_workflow>
+  <overview>
+    This workflow defines the Bob Shell oriented CVE remediation process for GitHub Actions.
+    It is designed for non-interactive execution where the prompt already contains the target issue or repository context.
+    The workflow must avoid user-dependent discovery patterns and must produce machine-parseable output for downstream workflow steps.
+  </overview>
+
+  <execution_model>
+    <mode>Non-interactive</mode>
+    <environment>GitHub Actions with Bob Shell</environment>
+    <approval_pattern>
+      Phase 1 creates the remediation PR and then exits cleanly so GitHub Actions can pause for human approval outside of Bob.
+      Later workflow phases are triggered by GitHub events rather than by an in-chat follow-up.
+    </approval_pattern>
+    <critical_difference_from_interactive_mode>
+      Do not behave like an IDE assistant waiting for step-by-step human approval after each action.
+      Complete the current automation phase in one run and emit a final structured summary.
+    </critical_difference_from_interactive_mode>
+  </execution_model>
+
+  <initialization>
+    <step number="1">
+      <title>Trust the workflow-provided context</title>
+      <description>
+        The GitHub Actions prompt should provide the issue number, repository, and expected workflow.
+        Treat that prompt as the primary task definition instead of asking discovery questions.
+      </description>
+      <actions>
+        <action>Extract the GitHub issue number or issue URL from the prompt if present</action>
+        <action>Extract repository owner and repo from the prompt, URL, or local git remote context if needed</action>
+        <action>Assume credentials are already provisioned through environment variables, git auth, and Bob Shell MCP config</action>
+      </actions>
+    </step>
+
+    <step number="2">
+      <title>Choose GitHub MCP first, then fallback safely</title>
+      <description>
+        This shell mode is intended to make GitHub MCP work inside Bob Shell on GitHub Actions.
+        GitHub MCP is the preferred path for issue retrieval, branch creation, PR creation, comments, labels, and reviewer requests.
+        Use GitHub CLI or authenticated REST calls only as fallback mechanisms when MCP fails, is unavailable, or returns incomplete data.
+      </description>
+      <priority_order>
+        <priority level="1">GitHub MCP for all supported GitHub operations</priority>
+        <priority level="2">Local git for repository workspace changes, commits, branch checkout, and push</priority>
+        <priority level="3">GitHub CLI or authenticated REST API only if the MCP path fails or cannot complete the required action</priority>
+      </priority_order>
+    </step>
+  </initialization>
+
+  <main_workflow>
+    <phase number="1" name="issue_resolution">
+      <title>Resolve the triggering issue</title>
+      <steps>
+        <step>Fetch the target issue details using GitHub MCP as the primary mechanism</step>
+        <step>Extract CVE ID, package name, application context, and any labels or severity hints</step>
+        <step>If the issue body is incomplete, infer only from authoritative sources and document the missing data clearly</step>
+      </steps>
+    </phase>
+
+    <phase number="2" name="concert_research">
+      <title>Research the vulnerability in Concert</title>
+      <steps>
+        <step>Load Concert credentials from the local environment or `.env` file</step>
+        <step>Query Concert APIs to validate the affected application and package exposure</step>
+        <step>Retrieve recommended upgrade version and risk context</step>
+        <step>Cross-check Concert findings with at least one authoritative public vulnerability source</step>
+      </steps>
+    </phase>
+
+    <phase number="3" name="branch_and_manifest_update">
+      <title>Create fix branch and update manifest files</title>
+      <steps>
+        <step>Create or checkout a remediation branch before editing files</step>
+        <step>Update only dependency manifests, lockfiles, or package metadata required for the package fix</step>
+        <step>Do not modify application code or tests in this mode</step>
+        <step>Keep changes minimal and attributable to the CVE remediation</step>
+      </steps>
+    </phase>
+
+    <phase number="4" name="commit_push_and_pr">
+      <title>Commit, push, and create pull request</title>
+      <steps>
+        <step>Commit with a structured CVE-focused message</step>
+        <step>Push the remediation branch to origin</step>
+        <step>Create the pull request using GitHub MCP as the preferred path</step>
+        <step>Add labels, reviewers, or comments using GitHub MCP when supported; use CLI/API only as fallback</step>
+      </steps>
+    </phase>
+
+    <phase number="5" name="structured_completion">
+      <title>Emit machine-readable completion output</title>
+      <description>
+        The GitHub Actions workflow needs to extract PR metadata from Bob Shell output.
+      </description>
+      <required_output>
+        <item>PR number</item>
+        <item>PR URL</item>
+        <item>Branch name</item>
+        <item>Package upgraded</item>
+        <item>Old version and new version</item>
+        <item>Issue number resolved</item>
+      </required_output>
+    </phase>
+  </main_workflow>
+
+  <output_contract>
+    <requirement priority="critical">
+      End the phase with a concise summary that includes literal fields for downstream parsing.
+    </requirement>
+    <template>
+      <![CDATA[
+CVE remediation complete
+PR_NUMBER: {pr_number}
+PR_URL: {pr_url}
+PR_BRANCH: {branch_name}
+PACKAGE_NAME: {package}
+OLD_VERSION: {old_version}
+NEW_VERSION: {new_version}
+ISSUE_NUMBER: {issue_number}
+      ]]>
+    </template>
+    <guidance>
+      <item>Always include both PR number and PR URL</item>
+      <item>Prefer the GitHub web URL for PR_URL</item>
+      <item>Use exact branch name pushed to origin</item>
+      <item>Keep field names stable and uppercase for easy grep-based extraction</item>
+    </guidance>
+  </output_contract>
+
+  <handoff_boundary>
+    <in_scope>
+      <item>Issue analysis</item>
+      <item>Concert research</item>
+      <item>Dependency manifest remediation</item>
+      <item>Branch creation</item>
+      <item>Commit and push</item>
+      <item>Pull request creation</item>
+    </in_scope>
+    <out_of_scope>
+      <item>Running unit tests as a decision gate for this mode</item>
+      <item>Fixing application code for post-upgrade breakage</item>
+      <item>Interactive reviewer selection conversations</item>
+      <item>Waiting inside Bob Shell for external approval events</item>
+    </out_of_scope>
+  </handoff_boundary>
+</shell_workflow>
+
+<!-- Made with Bob -->

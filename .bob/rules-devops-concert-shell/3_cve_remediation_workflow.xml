@@ -1,0 +1,154 @@
+<cve_remediation_workflow>
+  <overview>
+    This workflow defines automated CVE remediation for Bob Shell running in GitHub Actions.
+    It is the shell-oriented counterpart to the interactive DevOps workflow.
+    GitHub MCP is the preferred GitHub integration path, while local git performs workspace changes and `gh` or authenticated REST API act only as fallback for failed MCP operations.
+  </overview>
+
+  <workflow_context>
+    <mode_type>automation_phase</mode_type>
+    <trigger_source>GitHub Actions workflow prompt or issue-triggered automation</trigger_source>
+    <approval_model>
+      Bob completes the package remediation phase and exits.
+      Human review and approval happen in GitHub after the PR is created.
+      Bob does not wait inside the shell session for approval events.
+    </approval_model>
+  </workflow_context>
+
+  <workflow_phases>
+    <phase number="1" name="resolve_issue_context">
+      <title>Resolve the GitHub issue and remediation target</title>
+      <steps>
+        <step number="1">
+          <action>Use GitHub MCP first to fetch the target issue details</action>
+          <accepted_inputs>
+            <input>Explicit issue URL in the prompt</input>
+            <input>Explicit issue number in the prompt</input>
+            <input>Repository plus issue number from workflow context</input>
+          </accepted_inputs>
+        </step>
+        <step number="2">
+          <action>Extract CVE ID, package name, repository, and application context from the issue body and title</action>
+        </step>
+        <step number="3">
+          <action>If GitHub MCP fails, use `gh` CLI or authenticated REST API as fallback and record that fallback was used</action>
+        </step>
+      </steps>
+      <output>
+        Repository owner and repo, issue number, CVE ID, package name, and any relevant severity or application context
+      </output>
+    </phase>
+
+    <phase number="2" name="research_concert_and_public_sources">
+      <title>Research with Concert first, then validate externally</title>
+      <prerequisites>
+        <prerequisite>Concert credentials are available from environment variables or `.env`</prerequisite>
+      </prerequisites>
+      <steps>
+        <step>Load Concert credentials from `.env` or the shell environment</step>
+        <step>Query Concert to identify the affected application and recommended package version</step>
+        <step>Cross-reference the CVE with at least one authoritative public source such as NVD or GitHub Advisory data</step>
+        <step>Choose the remediation version using Concert as the primary internal source of truth, while documenting any mismatch with public advisories</step>
+      </steps>
+      <output>
+        Confirmed remediation version, risk context, and justification
+      </output>
+    </phase>
+
+    <phase number="3" name="create_and_checkout_branch">
+      <title>Create remediation branch before modifying files</title>
+      <branch_naming>
+        <format>fix/cve-{CVE-ID}-{package-name}</format>
+      </branch_naming>
+      <rules>
+        <rule priority="critical">Never modify files on main or master</rule>
+        <rule priority="critical">Create the branch before editing any dependency manifest</rule>
+        <rule priority="high">Prefer GitHub MCP create_branch first, then checkout locally</rule>
+      </rules>
+      <steps>
+        <step>Attempt remote branch creation with GitHub MCP</step>
+        <step>If the branch already exists or MCP branch creation fails, use local git checkout or local branch creation as fallback</step>
+        <step>Verify the current branch before modifying files</step>
+      </steps>
+    </phase>
+
+    <phase number="4" name="manifest_only_package_update">
+      <title>Update dependency manifests only</title>
+      <scope_rules>
+        <rule priority="critical">Only modify dependency manifests, lockfiles, or package metadata required for the CVE fix</rule>
+        <rule priority="critical">Do not modify application source files</rule>
+        <rule priority="critical">Do not modify test files</rule>
+        <rule priority="critical">Do not perform code compatibility remediation in this mode</rule>
+      </scope_rules>
+      <steps>
+        <step>Read the current dependency manifest</step>
+        <step>Apply the selected remediation version</step>
+        <step>Keep changes focused, minimal, and attributable to the CVE fix</step>
+      </steps>
+    </phase>
+
+    <phase number="5" name="commit_push_and_pr_creation">
+      <title>Commit, push, and create the pull request</title>
+      <steps>
+        <step>Commit the manifest changes using a structured CVE remediation message</step>
+        <step>Push the remediation branch to origin</step>
+        <step>Use GitHub MCP create_pull_request as the preferred PR creation path</step>
+        <step>If GitHub MCP PR creation fails, use `gh` CLI or authenticated REST API as fallback</step>
+        <step>Optionally add labels, reviewers, and comments with GitHub MCP first and fallback only when necessary</step>
+      </steps>
+      <commit_message_template>
+        <![CDATA[
+fix: upgrade {package} to {new_version} for CVE-{cve_id}
+
+- Addresses CVE-{cve_id} in {package}
+- Upgraded from {old_version} to {new_version}
+- Concert recommendation: {recommendation_details}
+- Resolves #{issue_number}
+        ]]>
+      </commit_message_template>
+    </phase>
+
+    <phase number="6" name="completion_output">
+      <title>Emit parseable completion output</title>
+      <requirement>
+        The final shell output must be stable and parseable by the GitHub Actions workflow.
+      </requirement>
+      <template>
+        <![CDATA[
+CVE remediation complete
+MCP_PRIMARY_PATH: success|fallback_used
+PR_NUMBER: {pr_number}
+PR_URL: {pr_url}
+PR_BRANCH: {branch_name}
+ISSUE_NUMBER: {issue_number}
+PACKAGE_NAME: {package}
+OLD_VERSION: {old_version}
+NEW_VERSION: {new_version}
+        ]]>
+      </template>
+      <fallback_fields>
+        <field>FALLBACK_STEP: {step_name}</field>
+        <field>FALLBACK_REASON: {brief_reason}</field>
+      </fallback_fields>
+    </phase>
+  </workflow_phases>
+
+  <scope_boundaries>
+    <in_scope>
+      <item>Fetch the triggering issue</item>
+      <item>Research Concert recommendations</item>
+      <item>Cross-validate public advisory information</item>
+      <item>Update dependency manifests</item>
+      <item>Create remediation branch</item>
+      <item>Commit, push, and create PR</item>
+    </in_scope>
+    <out_of_scope>
+      <item>Waiting for approval inside Bob Shell</item>
+      <item>Running tests as part of this mode’s success criteria</item>
+      <item>Fixing broken application code after package upgrade</item>
+      <item>Updating test code to restore compatibility</item>
+    </out_of_scope>
+  </scope_boundaries>
+</cve_remediation_workflow>
+
+<!-- Made with Bob -->
