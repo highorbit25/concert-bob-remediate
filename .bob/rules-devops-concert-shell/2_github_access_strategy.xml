@@ -18,31 +18,37 @@
 
   <supported_operations>
     <operation name="fetch_issue_details">
-      <preferred_path>GitHub MCP</preferred_path>
+      <preferred_path>GitHub MCP issue retrieval capability</preferred_path>
+      <allowed_mcp_patterns>
+        <pattern>fetch a specific issue by number</pattern>
+        <pattern>fetch a specific issue by full GitHub issue URL</pattern>
+        <pattern>use a mode-provided GitHub issue fetch abstraction when available</pattern>
+      </allowed_mcp_patterns>
+      <forbidden_assumption>Do not assume a specific raw MCP tool name such as `get_issue` is exposed in Bob Shell</forbidden_assumption>
       <fallback>gh issue view or GitHub REST API</fallback>
     </operation>
     <operation name="list_assigned_issues">
-      <preferred_path>GitHub MCP</preferred_path>
+      <preferred_path>GitHub MCP issue listing capability</preferred_path>
       <fallback>gh issue list or GitHub REST API</fallback>
     </operation>
     <operation name="create_branch">
-      <preferred_path>GitHub MCP create_branch</preferred_path>
+      <preferred_path>GitHub MCP branch creation capability</preferred_path>
       <fallback>local git checkout -b plus git push -u origin</fallback>
     </operation>
     <operation name="create_pull_request">
-      <preferred_path>GitHub MCP create_pull_request</preferred_path>
+      <preferred_path>GitHub MCP pull request creation capability</preferred_path>
       <fallback>gh pr create or GitHub REST API</fallback>
     </operation>
     <operation name="label_pull_request">
-      <preferred_path>GitHub MCP when supported</preferred_path>
+      <preferred_path>GitHub MCP PR or issue update capability when exposed</preferred_path>
       <fallback>gh pr edit or GitHub REST API</fallback>
     </operation>
     <operation name="request_reviewers">
-      <preferred_path>GitHub MCP when supported</preferred_path>
+      <preferred_path>GitHub MCP reviewer request capability when exposed</preferred_path>
       <fallback>gh pr edit or GitHub REST API</fallback>
     </operation>
     <operation name="add_comment">
-      <preferred_path>GitHub MCP add_issue_comment</preferred_path>
+      <preferred_path>GitHub MCP comment capability when exposed</preferred_path>
       <fallback>gh issue comment or GitHub REST API</fallback>
     </operation>
   </supported_operations>
@@ -63,10 +69,13 @@
     <step number="1">
       <action>Attempt the GitHub operation with MCP first</action>
       <examples>
-        <example>Fetch issue details with MCP</example>
-        <example>Create branch with MCP</example>
-        <example>Create pull request with MCP</example>
+        <example>Fetch issue details using the shell-available GitHub issue retrieval path</example>
+        <example>Create branch with the shell-available GitHub branch creation path</example>
+        <example>Create pull request with the shell-available GitHub PR creation path</example>
       </examples>
+      <critical_note>
+        In Bob Shell, do not narrate or assume a specific MCP tool name unless that exact tool is known to be available in the current mode runtime.
+      </critical_note>
     </step>
     <step number="2">
       <action>Evaluate MCP result</action>
@@ -94,9 +103,11 @@
 
   <preferred_mcp_actions>
     <issue_handling>
-      <item>Use GitHub MCP issue retrieval to read the triggering issue</item>
+      <item>Use the shell-available GitHub MCP issue retrieval path to read the triggering issue</item>
+      <item>If the prompt includes a full GitHub issue URL, prefer the MCP path that accepts the URL directly</item>
       <item>Use GitHub MCP search or listing only when necessary for issue discovery</item>
       <item>Avoid broad repository issue listing if the prompt already specifies the issue</item>
+      <item>Never hard-code `get_issue` as the required MCP tool name in instructions or reasoning</item>
     </issue_handling>
 
     <branch_handling>
