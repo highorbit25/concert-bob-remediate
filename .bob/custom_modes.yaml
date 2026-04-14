@@ -741,6 +741,5 @@ customModes:
       - read
       - edit
       - command
-      - - mcp
-        - serverName: github
       - browser
+      - mcp
