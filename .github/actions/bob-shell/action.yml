@@ -45,6 +45,15 @@ outputs:
   error:
     description: 'The error output from the Bob Shell execution, if any.'
     value: '${{ steps.bobshell_run.outputs.bobshell_errors }}'
+  pr_number:
+    description: 'The created pull request number, if Bob Shell emitted one.'
+    value: '${{ steps.bobshell_run.outputs.pr_number }}'
+  pr_branch:
+    description: 'The created pull request branch, if Bob Shell emitted one.'
+    value: '${{ steps.bobshell_run.outputs.pr_branch }}'
+  pr_url:
+    description: 'The created pull request URL, if Bob Shell emitted one.'
+    value: '${{ steps.bobshell_run.outputs.pr_url }}'
 
 runs:
   using: 'composite'
@@ -159,6 +168,24 @@ runs:
         echo "bobshell_errors<<EOF" >> "${GITHUB_OUTPUT}"
         echo "${BOBSHELL_ERRORS}" >> "${GITHUB_OUTPUT}"
         echo "EOF" >> "${GITHUB_OUTPUT}"
+
+        PR_NUMBER="$(printf '%s\n' "${BOBSHELL_RESPONSE}" | sed -n 's/^PR_NUMBER:[[:space:]]*//p' | head -1)"
+        PR_BRANCH="$(printf '%s\n' "${BOBSHELL_RESPONSE}" | sed -n 's/^PR_BRANCH:[[:space:]]*//p' | head -1)"
+        PR_URL="$(printf '%s\n' "${BOBSHELL_RESPONSE}" | sed -n 's/^PR_URL:[[:space:]]*//p' | head -1)"
+
+        echo "pr_number=${PR_NUMBER}" >> "${GITHUB_OUTPUT}"
+        echo "pr_branch=${PR_BRANCH}" >> "${GITHUB_OUTPUT}"
+        echo "pr_url=${PR_URL}" >> "${GITHUB_OUTPUT}"
+
+        if [[ -n "${PR_NUMBER}" ]]; then
+          echo "Extracted structured PR number: ${PR_NUMBER}"
+        fi
+        if [[ -n "${PR_BRANCH}" ]]; then
+          echo "Extracted structured PR branch: ${PR_BRANCH}"
+        fi
+        if [[ -n "${PR_URL}" ]]; then
+          echo "Extracted structured PR url: ${PR_URL}"
+        fi
 
         if [[ "${FAILED}" = true ]]; then
           LAST_LINE="$(echo "${BOBSHELL_ERRORS}" | tail -n1)"
