@@ -264,7 +264,7 @@ jobs:
     if: |
       github.event_name == 'pull_request_review' &&
       github.event.review.state == 'approved' &&
-      github.event.review.user.login == 'highorbit25' &&
+      github.event.review.user.login == 'baobin-devops' &&
       contains(github.event.pull_request.labels.*.name, 'cve-remediation-workflow')
     outputs:
       tests_passed: ${{ steps.run-tests.outputs.tests_passed }}
