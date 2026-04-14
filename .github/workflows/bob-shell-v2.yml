@@ -172,24 +172,34 @@ jobs:
       - name: Validate PR Creation
         id: validate-pr
         shell: bash
-        run: |
-          PR_NUM="${{ steps.bob-devops.outputs.pr_number }}"
-          PR_BRANCH="${{ steps.bob-devops.outputs.pr_branch }}"
-          PR_URL="${{ steps.bob-devops.outputs.pr_url }}"
-          
-          if [[ -z "$PR_NUM" ]]; then
-            echo "❌ Failed to get PR number from Bob Shell structured outputs"
-            echo "Bob output was: ${{ steps.bob-devops.outputs.summary }}"
-            exit 1
-          fi
-          
-          echo "✅ PR #${PR_NUM} created successfully"
-          if [[ -n "$PR_BRANCH" ]]; then
-            echo "✅ PR Branch: ${PR_BRANCH}"
-          fi
-          if [[ -n "$PR_URL" ]]; then
-            echo "✅ PR URL: ${PR_URL}"
-          fi
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = `${{ steps.bob-devops.outputs.pr_number }}`.trim();
+            const prBranch = `${{ steps.bob-devops.outputs.pr_branch }}`.trim();
+            const prUrl = `${{ steps.bob-devops.outputs.pr_url }}`.trim();
+
+            if (!prNumber) {
+              core.setFailed(
+                `Missing Bob Shell PR output. pr_number='${prNumber}', pr_branch='${prBranch}', pr_url='${prUrl}'`
+              );
+              return;
+            }
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: Number(prNumber),
+            });
+
+            core.info(`Validated PR #${pr.number}`);
+            if (prBranch) {
+              core.info(`PR Branch: ${prBranch}`);
+            }
+            if (prUrl) {
+              core.info(`PR URL: ${prUrl}`);
+            }
       
       - name: Add Approval Request Comment
         uses: actions/github-script@v7
