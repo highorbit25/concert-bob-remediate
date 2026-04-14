@@ -469,6 +469,11 @@ jobs:
             CRITICAL: Commit to branch "${{ needs.run-unit-tests-after-approval.outputs.pr_branch }}" - do NOT create a new branch!
           settings: ${{ vars.BOBSHELL_SETTINGS }}
       
+      - name: Pull Latest Changes from PR Branch
+        run: |
+          git pull origin ${{ needs.run-unit-tests-after-approval.outputs.pr_branch }}
+          echo "✅ Pulled latest changes from PR branch"
+      
       - name: Verify Tests Now Pass
         id: verify-tests
         working-directory: app/vulnerable
@@ -556,38 +561,3 @@ jobs:
               });
             }
 
-  # ============================================================================
-  # STEP 4: Handle PR Closure (Rejection)
-  # ============================================================================
-  handle-pr-closure:
-    name: "Handle PR Rejection"
-    runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'pull_request' &&
-      github.event.action == 'closed' &&
-      github.event.pull_request.merged == false &&
-      contains(github.event.pull_request.labels.*.name, 'cve-remediation-workflow')
-    
-    steps:
-      - name: Report Rejection
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const prNumber = context.payload.pull_request.number;
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: prNumber,
-              body: `## ❌ CVE Remediation Workflow Cancelled
-              
-              This PR was closed without merging. The CVE remediation workflow has been cancelled.
-              
-              If this was a mistake, you can:
-              1. Reopen this PR to continue the workflow
-              2. Create a new issue to start a fresh remediation workflow
-              
-              Workflow terminated.`
-            });
-
-# Made with Bob
