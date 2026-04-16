@@ -6,6 +6,25 @@
     Concert is the required internal source of truth for application-specific exposure and package recommendations, and it must be cross-referenced with authoritative public vulnerability sources such as NVD.
   </overview>
 
+  <critical_tool_usage_rules>
+    <rule priority="critical">
+      NEVER use web_fetch, browser_action, or any web browsing tools for CVE research
+    </rule>
+    <rule priority="critical">
+      ALWAYS use execute_command with curl to query APIs (NVD, GitHub Advisory, OSV, Concert)
+    </rule>
+    <rule priority="critical">
+      If an API call fails, document the failure and try alternative APIs - do NOT attempt browser-based research
+    </rule>
+    <rule priority="high">
+      Parse API responses using jq or grep to extract relevant information
+    </rule>
+    <rationale>
+      Web browsing tools are unreliable in GitHub Actions environments and cannot be automated.
+      API-based research with curl is fast, reliable, and produces structured data.
+    </rationale>
+  </critical_tool_usage_rules>
+
   <research_requirements>
     <requirement priority="critical">Always query IBM Concert API first to confirm the affected application, package exposure, and recommended remediation path.</requirement>
     <requirement priority="critical">Always cross-reference Concert findings with at least one authoritative public source, preferably NVD.</requirement>

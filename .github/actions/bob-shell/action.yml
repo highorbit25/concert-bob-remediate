@@ -157,9 +157,13 @@ runs:
 
         BOBSHELL_RESPONSE="$(cat "${TEMP_STDOUT}")"
 
+        # Sanitize response to prevent GitHub Actions file command interpretation
+        # Remove lines that look like file commands (contain square brackets in specific patterns)
+        SANITIZED_RESPONSE="$(echo "${BOBSHELL_RESPONSE}" | grep -v '^\[' || true)"
+        
         # Set the captured response as a step output, supporting multiline
         echo "bobshell_response<<EOF" >> "${GITHUB_OUTPUT}"
-        echo "${BOBSHELL_RESPONSE}" >> "${GITHUB_OUTPUT}"
+        echo "${SANITIZED_RESPONSE}" >> "${GITHUB_OUTPUT}"
         echo "EOF" >> "${GITHUB_OUTPUT}"
 
         BOBSHELL_ERRORS="$(cat "${TEMP_STDERR}")"
@@ -169,6 +173,7 @@ runs:
         echo "${BOBSHELL_ERRORS}" >> "${GITHUB_OUTPUT}"
         echo "EOF" >> "${GITHUB_OUTPUT}"
 
+        # Extract PR metadata from the original response (not sanitized)
         PR_NUMBER="$(printf '%s\n' "${BOBSHELL_RESPONSE}" | sed -n 's/^PR_NUMBER:[[:space:]]*//p' | head -1)"
         PR_BRANCH="$(printf '%s\n' "${BOBSHELL_RESPONSE}" | sed -n 's/^PR_BRANCH:[[:space:]]*//p' | head -1)"
         PR_URL="$(printf '%s\n' "${BOBSHELL_RESPONSE}" | sed -n 's/^PR_URL:[[:space:]]*//p' | head -1)"
