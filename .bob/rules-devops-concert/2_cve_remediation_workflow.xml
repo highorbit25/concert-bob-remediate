@@ -86,7 +86,7 @@
           <mandatory>YES - This step is required for every CVE</mandatory>
         </step>
         <step number="6">
-          <action>Cross-Reference: Query GitHub Advisory Database API</action>
+          <action>FALLBACK ONLY: Query GitHub Advisory Database API if NVD fails</action>
           <tool>execute_command</tool>
           <command>
             curl -X GET "https://api.github.com/advisories?cve_id={CVE-ID}" \
@@ -95,10 +95,12 @@
           </command>
           <extract>Package name, vulnerable version range, patched versions</extract>
           <parse>Use jq to extract vulnerability details</parse>
-          <mandatory>YES - This step is required for every CVE</mandatory>
+          <when_to_use>Only if NVD API fails, times out, or returns incomplete data</when_to_use>
+          <mandatory>NO - Use only as fallback for NVD</mandatory>
+          <documentation>If used, document in PR that GitHub Advisory was used because NVD was unavailable</documentation>
         </step>
         <step number="7">
-          <action>Cross-Reference: Query OSV API for cross-ecosystem data</action>
+          <action>FALLBACK ONLY: Query OSV API if both NVD and GitHub Advisory fail</action>
           <tool>execute_command</tool>
           <command>
             curl -X POST "https://api.osv.dev/v1/query" \
@@ -107,30 +109,38 @@
           </command>
           <extract>Vulnerability ID, affected ranges, fixed versions</extract>
           <parse>Use jq to filter by CVE ID and extract details</parse>
-          <mandatory>RECOMMENDED - Use if NVD or GitHub Advisory have incomplete data</mandatory>
+          <when_to_use>Only if both NVD and GitHub Advisory APIs fail or return incomplete data</when_to_use>
+          <mandatory>NO - Use only as last resort fallback</mandatory>
+          <documentation>If used, document in PR that OSV was used because NVD and GitHub Advisory were unavailable</documentation>
         </step>
         <step number="8">
-          <action>Validate Consistency Across All Sources</action>
+          <action>Validate Consistency Between Concert and External Source</action>
           <validation_checks>
-            <check>Verify CVE ID matches across all sources</check>
-            <check>Compare severity ratings (Concert vs NVD)</check>
+            <check>Verify CVE ID matches between Concert and NVD (or fallback source)</check>
+            <check>Compare severity ratings (Concert vs external source)</check>
             <check>Validate affected version ranges are consistent</check>
-            <check>Confirm patched versions align across sources</check>
+            <check>Confirm patched versions align</check>
             <check>Document any discrepancies found</check>
           </validation_checks>
           <if_discrepancy>
             Document the discrepancy in PR description and choose the most conservative (safest) fix
           </if_discrepancy>
+          <primary_validation>
+            NVD is the preferred external validation source. Only use GitHub Advisory or OSV if NVD is unavailable.
+          </primary_validation>
         </step>
         <step number="9">
           <action>Select Final Remediation Version</action>
           <decision_criteria>
-            <criterion>Concert recommendation (primary guidance)</criterion>
-            <criterion>NVD confirmed patched version (validation)</criterion>
-            <criterion>GitHub Advisory patched version (validation)</criterion>
-            <criterion>Choose version that satisfies all sources</criterion>
+            <criterion priority="1">Concert recommendation (primary guidance for internal context)</criterion>
+            <criterion priority="2">NVD confirmed patched version (preferred external validation)</criterion>
+            <criterion priority="3">GitHub Advisory or OSV patched version (if NVD unavailable)</criterion>
+            <criterion>Choose version that satisfies both Concert and external validation</criterion>
             <criterion>If conflict, choose newer patched version that's well-tested</criterion>
           </decision_criteria>
+          <documentation_requirement>
+            Document which external source was used (NVD, GitHub Advisory, or OSV) and why
+          </documentation_requirement>
         </step>
       </steps>
       <output>
