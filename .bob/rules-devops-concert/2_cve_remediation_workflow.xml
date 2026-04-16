@@ -22,44 +22,129 @@
     </phase>
 
     <phase number="2" name="concert_research">
-      <title>Research CVE in Concert</title>
+      <title>Research CVE in Concert and Cross-Reference with Public Sources</title>
       <description>
-        Query Concert API to understand vulnerability and get recommendations
+        Query Concert API first, then cross-reference with authoritative public sources (NVD, GitHub Advisory, OSV).
+        This is MANDATORY - you must validate Concert findings against external sources.
       </description>
       <prerequisites>
         <prerequisite>Load CONCERT_API_KEY from .env</prerequisite>
         <prerequisite>Load CONCERT_HOSTNAME from .env</prerequisite>
         <prerequisite>Load CONCERT_INSTANCE_ID from .env</prerequisite>
       </prerequisites>
+      <critical_requirement>
+        You MUST perform cross-reference validation using multiple API sources.
+        Do NOT skip external API validation - it is required for every CVE remediation.
+      </critical_requirement>
       <steps>
-        <step>
+        <step number="1">
           <action>Source .env file to load Concert credentials</action>
           <command>source .env</command>
         </step>
-        <step>
-          <action>List applications to find target application</action>
-          <endpoint>GET ${CONCERT_HOSTNAME}/concert/core/api/v1/applications</endpoint>
-          <headers>
-            <header>Authorization: ${CONCERT_API_KEY}</header>
-            <header>InstanceId: ${CONCERT_INSTANCE_ID}</header>
-          </headers>
+        <step number="2">
+          <action>Query Concert: List applications to find target application</action>
+          <tool>execute_command</tool>
+          <command>
+            source .env && curl -kX GET \
+              -H "Authorization: ${CONCERT_API_KEY}" \
+              -H "InstanceId: ${CONCERT_INSTANCE_ID}" \
+              "${CONCERT_HOSTNAME}/concert/core/api/v1/applications"
+          </command>
+          <extract>Application ID for the target application</extract>
         </step>
-        <step>
-          <action>Get vulnerability details for application</action>
-          <endpoint>GET ${CONCERT_HOSTNAME}/concert/core/api/v1/applications/{id}/vulnerability_details</endpoint>
+        <step number="3">
+          <action>Query Concert: Get vulnerability details for application</action>
+          <tool>execute_command</tool>
+          <command>
+            source .env && curl -kX GET \
+              -H "Authorization: ${CONCERT_API_KEY}" \
+              -H "InstanceId: ${CONCERT_INSTANCE_ID}" \
+              "${CONCERT_HOSTNAME}/concert/core/api/v1/applications/{id}/vulnerability_details"
+          </command>
+          <extract>CVE severity, CVSS score, affected packages from Concert</extract>
         </step>
-        <step>
-          <action>Fetch package recommendations</action>
-          <endpoint>GET ${CONCERT_HOSTNAME}/concert/core/api/v1/software_composition/recommendations</endpoint>
-          <filters>
-            <filter>Filter by package name</filter>
-            <filter>Filter by CVE ID if available</filter>
-          </filters>
+        <step number="4">
+          <action>Query Concert: Fetch package recommendations</action>
+          <tool>execute_command</tool>
+          <command>
+            source .env && curl -kX GET \
+              -H "Authorization: ${CONCERT_API_KEY}" \
+              -H "InstanceId: ${CONCERT_INSTANCE_ID}" \
+              "${CONCERT_HOSTNAME}/concert/core/api/v1/software_composition/recommendations?package_name={package}"
+          </command>
+          <extract>Concert's recommended package version</extract>
+        </step>
+        <step number="5">
+          <action>Cross-Reference: Query NVD API for official CVE details</action>
+          <tool>execute_command</tool>
+          <command>
+            curl -X GET "https://services.nvd.nist.gov/rest/json/cves/2.0?cveId={CVE-ID}" \
+              -H "Accept: application/json"
+          </command>
+          <extract>CVE description, CVSS score, severity, CWE classification</extract>
+          <parse>Use jq to extract key fields from JSON response</parse>
+          <mandatory>YES - This step is required for every CVE</mandatory>
+        </step>
+        <step number="6">
+          <action>Cross-Reference: Query GitHub Advisory Database API</action>
+          <tool>execute_command</tool>
+          <command>
+            curl -X GET "https://api.github.com/advisories?cve_id={CVE-ID}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28"
+          </command>
+          <extract>Package name, vulnerable version range, patched versions</extract>
+          <parse>Use jq to extract vulnerability details</parse>
+          <mandatory>YES - This step is required for every CVE</mandatory>
+        </step>
+        <step number="7">
+          <action>Cross-Reference: Query OSV API for cross-ecosystem data</action>
+          <tool>execute_command</tool>
+          <command>
+            curl -X POST "https://api.osv.dev/v1/query" \
+              -H "Content-Type: application/json" \
+              -d '{"package":{"name":"{package}","ecosystem":"{ecosystem}"},"version":"{current_version}"}'
+          </command>
+          <extract>Vulnerability ID, affected ranges, fixed versions</extract>
+          <parse>Use jq to filter by CVE ID and extract details</parse>
+          <mandatory>RECOMMENDED - Use if NVD or GitHub Advisory have incomplete data</mandatory>
+        </step>
+        <step number="8">
+          <action>Validate Consistency Across All Sources</action>
+          <validation_checks>
+            <check>Verify CVE ID matches across all sources</check>
+            <check>Compare severity ratings (Concert vs NVD)</check>
+            <check>Validate affected version ranges are consistent</check>
+            <check>Confirm patched versions align across sources</check>
+            <check>Document any discrepancies found</check>
+          </validation_checks>
+          <if_discrepancy>
+            Document the discrepancy in PR description and choose the most conservative (safest) fix
+          </if_discrepancy>
+        </step>
+        <step number="9">
+          <action>Select Final Remediation Version</action>
+          <decision_criteria>
+            <criterion>Concert recommendation (primary guidance)</criterion>
+            <criterion>NVD confirmed patched version (validation)</criterion>
+            <criterion>GitHub Advisory patched version (validation)</criterion>
+            <criterion>Choose version that satisfies all sources</criterion>
+            <criterion>If conflict, choose newer patched version that's well-tested</criterion>
+          </decision_criteria>
         </step>
       </steps>
       <output>
-        Concert's recommended package version and upgrade path
+        <item>Concert's recommended package version</item>
+        <item>NVD CVE details and validation</item>
+        <item>GitHub Advisory package details and validation</item>
+        <item>OSV cross-ecosystem validation (if used)</item>
+        <item>Final selected version with rationale</item>
+        <item>Documentation of any discrepancies found</item>
       </output>
+      <documentation_requirement>
+        All API queries and responses MUST be documented in the PR description under "Research Sources" section.
+        Include the actual commands used and key findings from each source.
+      </documentation_requirement>
     </phase>
 
     <phase number="3" name="branch_creation">

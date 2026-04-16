@@ -158,9 +158,14 @@ runs:
         BOBSHELL_RESPONSE="$(cat "${TEMP_STDOUT}")"
 
         # Sanitize response to prevent GitHub Actions file command interpretation
-        # Remove lines containing command execution metadata with brackets and parentheses
-        # These lines typically look like: "command [current working directory ...] (description) (time)"
-        SANITIZED_RESPONSE="$(echo "${BOBSHELL_RESPONSE}" | grep -v '\[current working directory' || true)"
+        # Remove lines that could be misinterpreted as GitHub Actions file commands:
+        # - Lines with [current working directory ...]
+        # - Lines starting with --- (like ---output---)
+        # - Lines that look like file command patterns
+        SANITIZED_RESPONSE="$(echo "${BOBSHELL_RESPONSE}" | \
+          grep -v '\[current working directory' | \
+          grep -v '^---' | \
+          grep -v '^\[' || true)"
         
         # Set the captured response as a step output, supporting multiline
         echo "bobshell_response<<EOF" >> "${GITHUB_OUTPUT}"
