@@ -3,8 +3,6 @@ name: Bob Shell V2 - CVE Remediation with Approvals
 on:
   issues:
     types: [opened, labeled]
-  pull_request_review:
-    types: [submitted]
   pull_request:
     types: [closed]
   workflow_dispatch:
@@ -35,7 +33,7 @@ permissions:
 
 jobs:
   # ============================================================================
-  # DEBUG JOB: Custom Prompt for MCP Debugging
+  # DEBUG JOB: Custom Prompt for Debugging
   # ============================================================================
   debug-custom-prompt:
     name: "Debug: Custom Prompt"
@@ -215,15 +213,15 @@ jobs:
               This PR contains package upgrades to fix a security vulnerability.
               
               **Next Steps:**
-              1. DevOps Engineer: Review the package changes
-              2. **Approve this PR** to trigger the next phase (unit tests will run automatically)
-              3. If you need to reject, close this PR with a comment
+              1. DevOps Engineer: Review the package changes in this PR
+              2. Approve the protected \`devops-approval\` environment in the workflow run
+              3. If you need to reject, deny the environment approval or close this PR with a comment
               
-              **To approve:** Click "Review changes" → "Approve" → "Submit review"
+              **To approve the workflow:** Open the current workflow run and use the **Review deployments** approval for the \`devops-approval\` environment
               
-              ⏸️ Workflow paused - waiting for your approval (no timeout, will wait indefinitely)...
+              ⏸️ Workflow paused - waiting for environment approval
               
-              Once approved, the workflow will automatically:
+              Once approved, the same workflow run will automatically:
               - Run unit tests
               - Fix any failing tests if needed
               - Request Software Lead review`
@@ -256,30 +254,28 @@ jobs:
             });
 
   # ============================================================================
-  # STEP 2: Run Unit Tests After DevOps Approval
+  # STEP 2: DevOps Environment Approval Gate
   # ============================================================================
-  run-unit-tests-after-approval:
-    name: "Step 2: Run Unit Tests (After Approval)"
+  devops-approval-gate:
+    name: "Step 2: DevOps Approval Gate"
     runs-on: ubuntu-latest
+    needs: devops-cve-research
     if: |
-      github.event_name == 'pull_request_review' &&
-      github.event.review.state == 'approved' &&
-      github.event.review.user.login == 'baobin-devops' &&
-      contains(github.event.pull_request.labels.*.name, 'cve-remediation-workflow')
+      needs.devops-cve-research.result == 'success'
+    environment:
+      name: devops-approval
     outputs:
-      tests_passed: ${{ steps.run-tests.outputs.tests_passed }}
-      pr_number: ${{ github.event.pull_request.number }}
-      pr_branch: ${{ github.event.pull_request.head.ref }}
+      pr_number: ${{ needs.devops-cve-research.outputs.pr_number }}
+      pr_branch: ${{ needs.devops-cve-research.outputs.pr_branch }}
     
     steps:
-      - name: Update PR Status
+      - name: Mark Approval Received
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const prNumber = context.payload.pull_request.number;
+            const prNumber = Number(`${{ needs.devops-cve-research.outputs.pr_number }}`.trim());
             
-            // Remove awaiting approval label
             try {
               await github.rest.issues.removeLabel({
                 owner: context.repo.owner,
@@ -288,32 +284,39 @@ jobs:
                 name: 'awaiting-devops-approval'
               });
             } catch (e) {
-              console.log('Label may not exist:', e.message);
+              core.info(`Label may not exist: ${e.message}`);
             }
-            
-            // Add running tests label
-            await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: prNumber,
-              labels: ['running-unit-tests']
-            });
             
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: prNumber,
-              body: `## ✅ DevOps Approval Received!
+              body: `## ✅ DevOps Environment Approval Received!
               
-              Thank you @${{ github.event.review.user.login }} for approving the package upgrade.
+              The protected \`devops-approval\` environment was approved.
               
-              🧪 Running unit tests now...`
+              🧪 Continuing the same workflow run with unit tests now...`
             });
-      
+
+  # ============================================================================
+  # STEP 3: Run Unit Tests After DevOps Approval
+  # ============================================================================
+  run-unit-tests-after-approval:
+    name: "Step 3: Run Unit Tests (After Approval)"
+    runs-on: ubuntu-latest
+    needs: devops-approval-gate
+    if: |
+      needs.devops-approval-gate.result == 'success'
+    outputs:
+      tests_passed: ${{ steps.run-tests.outputs.tests_passed }}
+      pr_number: ${{ needs.devops-approval-gate.outputs.pr_number }}
+      pr_branch: ${{ needs.devops-approval-gate.outputs.pr_branch }}
+    
+    steps:
       - name: Checkout PR Branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: ${{ needs.devops-approval-gate.outputs.pr_branch }}
       
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -347,27 +350,15 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const prNumber = context.payload.pull_request.number;
+            const prNumber = Number(`${{ needs.devops-approval-gate.outputs.pr_number }}`.trim());
             const testsPassed = '${{ steps.run-tests.outputs.tests_passed }}' === 'true';
-            
-            // Remove running tests label
-            try {
-              await github.rest.issues.removeLabel({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                name: 'running-unit-tests'
-              });
-            } catch (e) {
-              console.log('Label may not exist:', e.message);
-            }
             
             if (testsPassed) {
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: prNumber,
-                labels: ['tests-passed', 'ready-for-software-lead-review']
+                labels: ['ready-for-software-lead-review']
               });
               
               await github.rest.issues.createComment({
@@ -385,7 +376,6 @@ jobs:
                 @amrupapz Please review and approve for merge.`
               });
               
-              // Request Software Lead review
               await github.rest.pulls.requestReviewers({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -393,13 +383,6 @@ jobs:
                 reviewers: ['amrupapz']
               });
             } else {
-              await github.rest.issues.addLabels({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                labels: ['tests-failed', 'needs-code-remediation']
-              });
-              
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -408,19 +391,15 @@ jobs:
                 
                 The unit tests failed after the package upgrade. Code changes are needed.
                 
-                **Next Steps:**
-                - Bob will now analyze the failures and fix the code
-                - This will happen automatically in the next workflow job
-                
-                ⏳ Starting code remediation...`
+                ⏳ Starting Bob code remediation...`
               });
             }
 
   # ============================================================================
-  # STEP 3: Fix Failing Tests (if needed)
+  # STEP 4: Fix Failing Tests (if needed)
   # ============================================================================
   fix-failing-tests:
-    name: "Step 3: Fix Failing Unit Tests"
+    name: "Step 4: Fix Failing Unit Tests"
     runs-on: ubuntu-latest
     needs: run-unit-tests-after-approval
     if: |
@@ -487,27 +466,15 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const prNumber = ${{ needs.run-unit-tests-after-approval.outputs.pr_number }};
+            const prNumber = Number(`${{ needs.run-unit-tests-after-approval.outputs.pr_number }}`.trim());
             const testsNowPass = '${{ steps.verify-tests.outcome }}' === 'success';
-            
-            // Remove needs remediation label
-            try {
-              await github.rest.issues.removeLabel({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                name: 'needs-code-remediation'
-              });
-            } catch (e) {
-              console.log('Label may not exist:', e.message);
-            }
             
             if (testsNowPass) {
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: prNumber,
-                labels: ['tests-passed', 'ready-for-software-lead-review']
+                labels: ['ready-for-software-lead-review']
               });
               
               await github.rest.issues.createComment({
@@ -525,7 +492,6 @@ jobs:
                 @amrupapz Please review the code fixes and approve for merge.`
               });
               
-              // Request Software Lead review
               await github.rest.pulls.requestReviewers({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -537,7 +503,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: prNumber,
-                labels: ['tests-failed', 'needs-manual-intervention']
+                labels: ['needs-manual-intervention']
               });
               
               await github.rest.issues.createComment({
@@ -552,7 +518,6 @@ jobs:
                 @highorbit25 Please review the changes and continue the remediation.`
               });
               
-              // Assign to SWE for manual review
               await github.rest.issues.addAssignees({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
