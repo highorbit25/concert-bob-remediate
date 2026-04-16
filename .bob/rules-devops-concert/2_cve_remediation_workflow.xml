@@ -175,12 +175,102 @@
           </format>
         </manifest>
       </manifest_types>
+      <transitive_dependency_considerations>
+        <title>Analyzing Transitive Dependencies</title>
+        <description>
+          When upgrading a package, consider its impact on transitive (indirect) dependencies.
+          A package upgrade may require or conflict with other packages in the dependency tree.
+        </description>
+        <importance>
+          Transitive dependencies are packages that your direct dependencies rely on.
+          Upgrading a package may introduce version conflicts or require updates to related packages.
+        </importance>
+        <analysis_steps>
+          <step>
+            <action>Review Concert's recommendation for transitive dependency impacts</action>
+            <note>Concert may indicate if the upgrade affects other packages</note>
+          </step>
+          <step>
+            <action>Check if the package upgrade requires updates to related packages</action>
+            <example>Upgrading Flask may require upgrading Werkzeug, Jinja2, or Click</example>
+          </step>
+          <step>
+            <action>For Python projects, consider running pip install verification</action>
+            <note>This helps identify dependency conflicts before committing</note>
+          </step>
+          <step>
+            <action>Document any transitive dependency concerns in the PR description</action>
+            <note>This helps reviewers understand the full scope of changes</note>
+          </step>
+        </analysis_steps>
+        <common_scenarios>
+          <scenario type="python">
+            <description>Python packages often have strict version requirements for dependencies</description>
+            <example>
+              Flask 2.3.x requires Werkzeug>=2.3.0, Jinja2>=3.1.0
+              Upgrading Flask may necessitate upgrading these as well
+            </example>
+            <verification>
+              After updating requirements.txt, run: pip install -r requirements.txt --dry-run
+              This shows what would be installed without actually installing
+            </verification>
+          </scenario>
+          <scenario type="nodejs">
+            <description>npm/yarn automatically resolves transitive dependencies</description>
+            <note>Package.json typically only lists direct dependencies; transitive deps are in package-lock.json</note>
+            <verification>
+              After updating package.json, run: npm install --dry-run
+              This shows dependency resolution without modifying node_modules
+            </verification>
+          </scenario>
+          <scenario type="java">
+            <description>Maven/Gradle handle transitive dependencies through dependency management</description>
+            <note>Check for version conflicts in dependency tree</note>
+            <verification>
+              For Maven: mvn dependency:tree
+              For Gradle: gradle dependencies
+            </verification>
+          </scenario>
+        </common_scenarios>
+        <pip_install_verification>
+          <title>Python Dependency Verification</title>
+          <description>
+            For Python projects, verify that all requirements can be met after the package upgrade.
+            This helps catch dependency conflicts early.
+          </description>
+          <when_to_use>
+            <condition>After updating requirements.txt</condition>
+            <condition>Before committing changes</condition>
+            <condition>When upgrading packages with many dependencies</condition>
+          </when_to_use>
+          <verification_command>
+            <command>pip install -r requirements.txt --dry-run</command>
+            <purpose>Simulates installation to check for conflicts without modifying environment</purpose>
+            <expected_output>Successfully resolved dependencies without errors</expected_output>
+          </verification_command>
+          <alternative_verification>
+            <command>pip check</command>
+            <purpose>Verifies installed packages have compatible dependencies</purpose>
+            <note>Only works if packages are already installed</note>
+          </alternative_verification>
+          <handling_conflicts>
+            <if_conflicts_found>
+              <step>Document the conflict in PR description</step>
+              <step>Note which packages have incompatible version requirements</step>
+              <step>Suggest that additional package updates may be needed</step>
+              <step>Do NOT attempt to fix code compatibility issues in this mode</step>
+            </if_conflicts_found>
+          </handling_conflicts>
+        </pip_install_verification>
+      </transitive_dependency_considerations>
       <steps>
         <step>Verify you are on the fix branch (not main)</step>
         <step>Read current manifest file</step>
         <step>Identify package version to update</step>
         <step>Apply Concert's recommended version using apply_diff or write_to_file</step>
         <step>Add comment explaining CVE fix</step>
+        <step>For Python projects: Run pip install -r requirements.txt --dry-run to verify dependencies</step>
+        <step>Document any transitive dependency concerns or conflicts in notes for PR</step>
       </steps>
     </phase>
 
@@ -218,38 +308,57 @@
     <phase number="6" name="pr_creation">
       <title>Create Pull Request</title>
       <description>
-        Create PR with comprehensive CVE and Concert details
+        Create PR with comprehensive CVE and Concert details following the standardized format
       </description>
       <pr_title_format>
-        <template>fix: CVE-{CVE-ID} - Upgrade {package} to {version}</template>
-        <example>fix: CVE-2023-12345 - Upgrade flask to 2.3.3</example>
+        <template>🔒 Security Fix: CVE-{CVE-ID} - Upgrade {package} to {version}</template>
+        <example>🔒 Security Fix: CVE-2023-12345 - Upgrade flask to 2.3.3</example>
+        <rules>
+          <rule>Always start with 🔒 Security Fix emoji</rule>
+          <rule>Include CVE ID for traceability</rule>
+          <rule>Specify package and version for clarity</rule>
+        </rules>
       </pr_title_format>
       <pr_description_template>
+        <reference>
+          Use the comprehensive template from .bob/rules-devops-concert/6_pr_formatting_and_documentation.xml
+        </reference>
+        <required_sections>
+          <section>🔒 Security Vulnerability Remediation</section>
+          <section>🔍 Vulnerability Analysis (CVE, Type, Severity, CVSS, CWE, Description, Attack Vector, Impact)</section>
+          <section>🔧 Changes Made (Package, From/To versions, File, Breaking Changes)</section>
+          <section>📋 Remediation Strategy (Research Sources, Fix Rationale, Alternative Approaches)</section>
+          <section>🎯 Concert API Analysis (Application, Recommendation, Risk Assessment, Endpoints Used)</section>
+          <section>📊 Impact Assessment (Security Impact, Functional Impact, Compatibility)</section>
+          <section>✅ Validation (Checklist including pip install verification and transitive dependency checks)</section>
+          <section>📚 References (CVE Details, Security Advisory, Package Changelog, CWE, Concert Issue)</section>
+          <section>🚀 Next Steps (CI/CD validation, follow-up workflow)</section>
+          <section>📝 Additional Notes (including transitive dependency considerations and pip install results)</section>
+        </required_sections>
+        <transitive_dependency_documentation>
+          <title>Document Transitive Dependencies in PR</title>
+          <when_to_include>
+            <condition>If pip install verification revealed dependency conflicts</condition>
+            <condition>If the package upgrade requires related package updates</condition>
+            <condition>If Concert indicated transitive dependency impacts</condition>
+          </when_to_include>
+          <format>
+            Add to "📝 Additional Notes" section:
+            
+            **Transitive Dependency Considerations:**
+            - {List any transitive dependencies affected}
+            - {Note any version conflicts discovered during pip install verification}
+            - {Mention if additional package updates may be needed}
+            - {Reference pip install --dry-run results if relevant}
+          </format>
+        </transitive_dependency_documentation>
         <template>
-          ## CVE Remediation
-
-          **CVE ID:** CVE-{CVE-ID}
-          **Package:** {package}
-          **Severity:** {severity}
-
-          ## Changes
-
-          - Upgraded {package} from {old-version} to {new-version}
-          - Applied Concert recommendation: {recommendation-details}
-
-          ## Concert Analysis
-
-          {concert-vulnerability-details}
-
-          ## Testing
-
-          CI/CD will validate this change. Unit test failures and code compatibility issues will be addressed in a separate workflow.
-
-          ## References
-
-          - Resolves #{issue-number}
-          - Concert Application: {application-name}
-          - Concert Recommendation ID: {recommendation-id}
+          See .bob/rules-devops-concert/6_pr_formatting_and_documentation.xml for the complete template.
+          
+          Key additions for transitive dependencies:
+          - In ✅ Validation section, add: "- [x] Ran pip install verification (Python projects)"
+          - In ✅ Validation section, add: "- [x] Checked transitive dependency impacts"
+          - In 📝 Additional Notes section, document transitive dependency considerations and pip install results
         </template>
       </pr_description_template>
       <steps>

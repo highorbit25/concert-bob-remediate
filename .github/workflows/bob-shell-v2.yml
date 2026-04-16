@@ -159,12 +159,17 @@ jobs:
             1. Fetch the issue details from https://github.com/${{ github.repository }}/issues/${{ steps.get-issue.outputs.issue_number }}
             2. Research the CVE using Concert API (source .env for credentials: CONCERT_API_KEY, CONCERT_HOSTNAME, CONCERT_INSTANCE_ID)
             3. Apply the package fix to the manifest files (requirements.txt, package.json, etc.)
-            4. Create a branch following the naming convention: fix/cve-{CVE-ID}-{package-name}
-            5. Commit the changes with a descriptive message
-            6. Push the branch to origin
-            7. Create a pull request with comprehensive CVE details and Concert recommendations
+            4. IMPORTANT: Consider transitive dependencies when upgrading packages
+            5. For Python projects: Run 'pip install -r requirements.txt --dry-run' to verify all requirements can be met
+            6. Create a branch following the naming convention: fix/cve-{CVE-ID}-{package-name}
+            7. Commit the changes with a descriptive message
+            8. Push the branch to origin
+            9. Create a pull request with comprehensive CVE details, Concert recommendations, and transitive dependency analysis
             
-            IMPORTANT: Only update package manifest files. Do NOT modify application code or tests.
+            IMPORTANT:
+            - Only update package manifest files. Do NOT modify application code or tests.
+            - Document any transitive dependency impacts or conflicts in the PR description.
+            - Include pip install verification results for Python projects.
           settings: ${{ vars.BOBSHELL_SETTINGS }}
       
       - name: Validate PR Creation
