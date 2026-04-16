@@ -157,19 +157,69 @@ jobs:
             
             Follow this workflow:
             1. Fetch the issue details from https://github.com/${{ github.repository }}/issues/${{ steps.get-issue.outputs.issue_number }}
-            2. Research the CVE using Concert API (source .env for credentials: CONCERT_API_KEY, CONCERT_HOSTNAME, CONCERT_INSTANCE_ID)
-            3. Apply the package fix to the manifest files (requirements.txt, package.json, etc.)
-            4. IMPORTANT: Consider transitive dependencies when upgrading packages
-            5. For Python projects: Run 'pip install -r requirements.txt --dry-run' to verify all requirements can be met
-            6. Create a branch following the naming convention: fix/cve-{CVE-ID}-{package-name}
-            7. Commit the changes with a descriptive message
-            8. Push the branch to origin
-            9. Create a pull request with comprehensive CVE details, Concert recommendations, and transitive dependency analysis
             
-            IMPORTANT:
-            - Only update package manifest files. Do NOT modify application code or tests.
-            - Document any transitive dependency impacts or conflicts in the PR description.
-            - Include pip install verification results for Python projects.
+            2. MANDATORY CVE Research - Cross-Reference Validation:
+               a. Query Concert API first (source .env for credentials: CONCERT_API_KEY, CONCERT_HOSTNAME, CONCERT_INSTANCE_ID)
+                  - GET /applications to find application ID
+                  - GET /applications/{id}/vulnerability_details for CVE details
+                  - GET /software_composition/recommendations?package_name={package} for Concert recommendation
+               
+               b. MANDATORY: Query NVD API for official CVE validation
+                  - curl -X GET "https://services.nvd.nist.gov/rest/json/cves/2.0?cveId={CVE-ID}"
+                  - Extract: CVE description, CVSS score, severity, CWE
+               
+               c. MANDATORY: Query GitHub Advisory Database API
+                  - curl -X GET "https://api.github.com/advisories?cve_id={CVE-ID}" -H "Accept: application/vnd.github+json"
+                  - Extract: Package name, vulnerable versions, patched versions
+               
+               d. RECOMMENDED: Query OSV API for additional validation
+                  - curl -X POST "https://api.osv.dev/v1/query" with package/version data
+               
+               e. Validate consistency across all sources and document any discrepancies
+               f. Select final remediation version based on all sources (prefer Concert recommendation if validated)
+            
+            3. Apply the package fix to the manifest files (requirements.txt, package.json, etc.)
+            
+            4. IMPORTANT: Consider transitive dependencies when upgrading packages
+            
+            5. For Python projects: Run 'pip install -r requirements.txt --dry-run' to verify all requirements can be met
+            
+            6. Create a branch following the naming convention: fix/cve-{CVE-ID}-{package-name}
+            
+            7. Commit the changes with a descriptive message
+            
+            8. Push the branch to origin
+            
+            9. Create a pull request following the EXACT format from .bob/rules-devops-concert/6_pr_formatting_and_documentation.xml:
+               - PR Title: 🔒 Security Fix: CVE-{CVE-ID} - Upgrade {package} to {version}
+               - PR Description MUST include ALL these sections:
+                 * 🔒 Security Vulnerability Remediation
+                 * 🔍 Vulnerability Analysis (CVE, Type, Severity, CVSS, CWE, Description, Attack Vector, Impact)
+                 * 🔧 Changes Made (Package, From/To versions, File, Breaking Changes)
+                 * 📋 Remediation Strategy (Research Sources with URLs, Fix Rationale, Alternative Approaches)
+                 * 🎯 Concert API Analysis (Application, Recommendation, Risk Assessment, Endpoints Used)
+                 * 📊 Impact Assessment (Security Impact, Functional Impact, Compatibility)
+                 * ✅ Validation (Checklist including all API queries, pip install verification, transitive dependency checks)
+                 * 📚 References (NVD URL, GitHub Advisory URL, Package Changelog, CWE URL, Concert Issue)
+                 * 🚀 Next Steps (CI/CD validation, follow-up workflow)
+                 * 📝 Additional Notes (Transitive dependency considerations, pip install results)
+               - Include ALL API queries executed with their responses:
+                 * Concert API queries and responses
+                 * NVD API query and CVE details extracted
+                 * GitHub Advisory API query and package details extracted
+                 * OSV API query and results (if used)
+               - Document cross-reference validation results
+               - Include transitive dependency analysis
+               - Include pip install verification results (Python projects)
+            
+            CRITICAL REQUIREMENTS:
+            - You MUST query NVD API and GitHub Advisory API for every CVE - this is non-negotiable
+            - You MUST follow the PR template format from 6_pr_formatting_and_documentation.xml exactly
+            - Document all API queries and responses in the PR description
+            - Only update package manifest files. Do NOT modify application code or tests
+            - Document any transitive dependency impacts or conflicts in the PR description
+            - Include pip install verification results for Python projects
+            - If sources disagree, document the discrepancy and choose the safest version
           settings: ${{ vars.BOBSHELL_SETTINGS }}
       
       - name: Validate PR Creation
