@@ -19,120 +19,83 @@
   </pr_title_format>
 
   <pr_description_template>
+    <conciseness_guidelines>
+      <guideline>Keep descriptions brief but complete - aim for clarity over verbosity</guideline>
+      <guideline>Combine related information into single sentences where possible</guideline>
+      <guideline>Avoid repeating information across sections</guideline>
+      <guideline>Use bullet points for lists, not full paragraphs</guideline>
+      <guideline>Omit obvious or redundant statements</guideline>
+    </conciseness_guidelines>
     <template>
       <![CDATA[
 ## 🔒 Security Vulnerability Remediation
 
-### 🔍 Vulnerability Analysis
+**CVE**: {CVE-ID} | **Severity**: {CRITICAL/HIGH/MEDIUM/LOW} (CVSS {score}) | **Type**: {RCE/XSS/SQLi/etc.}
 
-**CVE**: {CVE-ID}
-**Type**: {RCE/XSS/SQL Injection/Configuration/etc.}
-**Category**: {Dependency/Code/Configuration/Infrastructure}
-**Severity**: {CRITICAL/HIGH/MEDIUM/LOW}
-**CVSS Score**: {score if available}
-**CWE**: {CWE-XXX if available}
+**Vulnerability**: {1-2 sentence description of what the vulnerability is and its impact}
 
-**Description**:
-{Brief explanation of what the vulnerability is and how it can be exploited}
+**Attack Vector**: {1 sentence on how it could be exploited}
 
-**Attack Vector**:
-{How an attacker could exploit this vulnerability}
+### 🔧 Changes
 
-**Impact**:
-{What could happen if this vulnerability is exploited - data breach, RCE, etc.}
+- **Package**: `{package}`
+- **Version**: `{old_version}` → `{new_version}`
+- **File**: `{file_path}`
+- **Breaking Changes**: {YES/NO - brief explanation if yes}
 
-### 🔧 Changes Made
+### 📋 Research & Validation
 
-**Package**: `{package}`
-**From**: `{old_version}` (vulnerable)
-**To**: `{new_version}` (patched)
-**File**: `{file_path}`
-**Breaking Changes**: {YES/NO - explain if yes}
+**Sources Consulted:**
+- [NVD](https://nvd.nist.gov/vuln/detail/{CVE-ID}) - {key finding in 5-10 words}
+- [GitHub Advisory]({url}) - {key finding in 5-10 words}
+- [Vendor Advisory]({url}) - {key finding in 5-10 words}
+- Concert API - {recommendation in 5-10 words}
 
-### 📋 Remediation Strategy
+**Cross-Reference Validation**: {1 sentence confirming all sources agree, or noting any discrepancy}
 
-**Research Sources:**
-- NVD: https://nvd.nist.gov/vuln/detail/{CVE-ID}
-- Vendor Advisory: {official_advisory_url}
-- Security Database: {snyk_or_github_advisory_url}
-- Package Changelog: {changelog_url}
+**Fix Rationale**: {1-2 sentences explaining why this version was chosen}
 
-**Fix Rationale:**
-- {Reason 1 - why this specific fix}
-- {Reason 2 - compatibility considerations}
-- {Reason 3 - minimal change principle}
-- {Reason 4 - security best practices followed}
+### 🎯 Concert Analysis
 
-**Alternative Approaches Considered:**
-- {Alternative 1 and why not chosen}
-- {Alternative 2 and why not chosen}
+- **Application**: {app_name}
+- **Recommendation**: {concert_recommendation}
+- **Risk Level**: {risk_assessment}
 
-### 🎯 Concert API Analysis
+### 📊 Impact
 
-**Concert Application**: {application_name}
-**Concert Recommendation**: {recommendation_details}
-**Concert Risk Assessment**: {risk_level}
-**Concert Upgrade Path**: {upgrade_path_from_concert}
+**Security**: {HIGH/MEDIUM/LOW} - {1 sentence on security improvement}
 
-**Concert API Endpoints Used:**
-- GET /applications - Found application ID
-- GET /applications/{id}/vulnerability_details - Retrieved CVE details
-- GET /software_composition/recommendations - Got upgrade recommendation
+**Functional**: {NONE/LOW/MEDIUM/HIGH} - {1 sentence on functional impact, or "No breaking changes" if none}
 
-### 📊 Impact Assessment
-
-**Security Impact**: {HIGH/MEDIUM/LOW}
-- Remediates {severity} vulnerability
-- Eliminates {attack_vector} attack vector
-- Reduces attack surface by {description}
-
-**Functional Impact**: {NONE/LOW/MEDIUM/HIGH}
-- Breaking changes: {YES/NO}
-- Migration required: {YES/NO}
-- Documentation updated: {YES/NO}
-
-**Compatibility**: {MAINTAINED/BREAKING}
-- {Explanation of compatibility with existing dependencies/code}
-- {Any version constraints or requirements}
+**Dependencies**: {1 sentence on transitive dependencies or compatibility, or "No conflicts detected" if none}
 
 ### ✅ Validation
 
-**Checklist:**
-- [x] Verified fix addresses the vulnerability
-- [x] Researched from authoritative sources (NVD, vendor advisory)
-- [x] Cross-referenced multiple security databases
-- [x] Consulted Concert API for recommendations
-- [x] Validated compatibility with current dependencies
-- [x] Identified breaking changes (if any)
-- [x] Updated package manifest files only
-- [x] No application code modified (as per mode scope)
-- [x] No test files modified (as per mode scope)
-- [x] Verified no new vulnerabilities introduced
+- [x] Cross-referenced NVD, GitHub Advisory, and Concert
+- [x] Validated compatibility (pip install --dry-run passed)
+- [x] Manifest-only changes (no code/test modifications)
+- [x] No new vulnerabilities introduced
 
 ### 📚 References
 
-- **CVE Details**: https://nvd.nist.gov/vuln/detail/{CVE-ID}
-- **Security Advisory**: {official_advisory_url}
-- **Package Changelog**: {changelog_url}
-- **CWE Details**: https://cwe.mitre.org/data/definitions/{CWE-XXX}.html
-- **Concert Issue**: #{issue_number}
-
-### 🚀 Next Steps
-
-This PR updates the package manifest only. CI/CD will validate the changes.
-If tests fail or code compatibility issues arise, they will be addressed in a follow-up workflow.
-
-### 📝 Additional Notes
-
-{Any other relevant information about the fix, deployment considerations, or follow-up actions}
+- [CVE-{CVE-ID}](https://nvd.nist.gov/vuln/detail/{CVE-ID})
+- [CWE-{XXX}](https://cwe.mitre.org/data/definitions/{CWE-XXX}.html)
+- [Package Changelog]({changelog_url})
+- Closes #{issue_number}
 
 ---
 
-**Automated Security Remediation** | Powered by IBM Concert + IBM Bob + GitHub MCP
-
-Closes #{issue_number}
+**Automated Security Remediation** | Concert + Bob + GitHub MCP
       ]]>
     </template>
+    <length_targets>
+      <target section="vulnerability">2-3 sentences maximum</target>
+      <target section="research_sources">1 line per source with brief key finding</target>
+      <target section="fix_rationale">1-2 sentences</target>
+      <target section="concert_analysis">3-4 bullet points</target>
+      <target section="impact">1 sentence per impact type</target>
+      <target section="total_pr_length">Aim for 30-40 lines total (excluding template structure)</target>
+    </length_targets>
   </pr_description_template>
 
   <section_guidelines>
