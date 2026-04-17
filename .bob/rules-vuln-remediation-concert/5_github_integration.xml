@@ -2,7 +2,67 @@
   <overview>
     Guidelines for using GitHub MCP to interact with pull requests, fetch PR details,
     and manage the vulnerability remediation workflow through GitHub.
+    
+    CRITICAL FOR BOB SHELL: When running in GitHub Actions (bob-shell), the workflow
+    provides the PR URL directly in the prompt. You MUST parse this URL and use
+    pull_request_read with the extracted components.
   </overview>
+
+  <github_mcp_usage_contexts>
+    <title>Two Usage Contexts</title>
+    
+    <bob_shell_context>
+      <description>Running in GitHub Actions via bob-shell-v2.yml workflow</description>
+      <characteristics>
+        <item>Prompt contains explicit PR URL (e.g., "Analyze the PR at https://github.com/...")</item>
+        <item>Prompt specifies the branch to commit to</item>
+        <item>Automated, non-interactive execution</item>
+      </characteristics>
+      <github_mcp_usage>
+        <critical>
+          ALWAYS parse the PR URL and use pull_request_read with method="get".
+          
+          Example prompt: "Analyze the PR at https://github.com/org/repo/pull/123"
+          
+          Step 1: Parse URL
+          - owner = "org"
+          - repo = "repo"
+          - pullNumber = 123
+          
+          Step 2: Use pull_request_read
+          <![CDATA[
+          <use_mcp_tool>
+          <server_name>github</server_name>
+          <tool_name>pull_request_read</tool_name>
+          <arguments>
+          {
+            "method": "get",
+            "owner": "org",
+            "repo": "repo",
+            "pullNumber": 123
+          }
+          </arguments>
+          </use_mcp_tool>
+          ]]>
+          
+          NEVER try to use issue_url parameter - it doesn't exist.
+        </critical>
+      </github_mcp_usage>
+    </bob_shell_context>
+    
+    <bob_ide_context>
+      <description>Running interactively in Bob IDE</description>
+      <characteristics>
+        <item>User asks "What are the GitHub PRs assigned to me?"</item>
+        <item>User provides PR number: "Review PR #123"</item>
+        <item>Interactive, conversational execution</item>
+      </characteristics>
+      <github_mcp_usage>
+        Use search_pull_requests with query "is:pr is:open assignee:@me"
+        for interactive PR discovery and selection.
+      </github_mcp_usage>
+    </bob_ide_context>
+  </github_mcp_usage_contexts>
 
   <github_mcp_capabilities>
     <title>Available GitHub MCP Operations</title>
@@ -147,25 +207,59 @@
     
     <scenario name="user_provides_pr_url">
       <user_query>Review https://github.com/org/repo/pull/123</user_query>
+      <or>Analyze the PR at https://github.com/org/repo/pull/123</or>
       
       <response_steps>
         <step number="1">
-          <action>Parse GitHub URL</action>
-          <pattern>https://github\.com/([^/]+)/([^/]+)/pull/(\d+)</pattern>
-          <extract>
-            - Organization/owner
-            - Repository name
-            - PR number
-          </extract>
+          <action>Extract the FULL GitHub URL from the prompt</action>
+          <pattern>https://github\.com/[^/]+/[^/]+/pull/\d+</pattern>
+          <critical>
+            Do NOT parse the URL into components.
+            Do NOT extract just the PR number.
+            Use the COMPLETE URL as-is.
+          </critical>
         </step>
         
         <step number="2">
-          <action>Use GitHub MCP with full URL</action>
-          <tool>fetch_github_issue with issue_url parameter</tool>
+          <action>Parse URL and use pull_request_read</action>
+          <tool>pull_request_read</tool>
+          <parameters>method, owner, repo, pullNumber</parameters>
+          <example>
+            <![CDATA[
+            <use_mcp_tool>
+            <server_name>github</server_name>
+            <tool_name>pull_request_read</tool_name>
+            <arguments>
+            {
+              "method": "get",
+              "owner": "highorbit25",
+              "repo": "concert-bob-remediate",
+              "pullNumber": 38
+            }
+            </arguments>
+            </use_mcp_tool>
+            ]]>
+          </example>
+          <critical>
+            You MUST parse the URL to extract owner, repo, and pullNumber.
+            There is NO issue_url parameter in pull_request_read.
+          </critical>
         </step>
         
         <step number="3">
+          <action>Extract PR metadata from response</action>
+          <extract>
+            - PR number (from response)
+            - head.ref (source branch name)
+            - base.ref (target branch, usually main)
+            - PR title and description
+            - Changed files
+          </extract>
+        </step>
+        
+        <step number="4">
           <action>Continue with standard PR analysis</action>
+          <reference>See 2_pr_analysis.xml</reference>
         </step>
       </response_steps>
     </scenario>
@@ -468,6 +562,15 @@
       </rationale>
       <never>Never create a new branch like "pr-38" or "fix-tests"</never>
       <always>Always use the branch name from the PR metadata (e.g., "fix/cve-2023-12345-flask")</always>
+      
+      <bob_shell_workflow>
+        <additional_rule>
+          In bob-shell context, the workflow prompt explicitly provides the branch name.
+          Example: "Commit your fixes to the EXISTING PR branch: fix/cve-2023-12345-flask"
+          
+          You MUST use this exact branch name in all git commands.
+        </additional_rule>
+      </bob_shell_workflow>
     </critical_principle>
     
     <preparation>
@@ -564,7 +667,7 @@ Related to CVE-2024-12345"
       <when>After pushing fixes to the PR branch</when>
       <purpose>Document what was fixed and why for the PR reviewers</purpose>
       <how>Use GitHub MCP to add a comment to the PR</how>
-      <tool>use_mcp_tool with github server and add_issue_comment tool</tool>
+      <tool>use_mcp_tool with github server and pull_request_review_write tool</tool>
       
       <step_by_step>
         <step number="1">
@@ -577,26 +680,30 @@ Related to CVE-2024-12345"
           <tool>use_mcp_tool</tool>
           <parameters>
             <server_name>github</server_name>
-            <tool_name>add_issue_comment</tool_name>
+            <tool_name>pull_request_review_write</tool_name>
             <arguments>
               {
+                "method": "create",
                 "owner": "[repo-owner]",
                 "repo": "[repo-name]",
-                "issue_number": [pr-number],
-                "body": "[comment-content]"
+                "pullNumber": [pr-number],
+                "body": "[comment-content]",
+                "event": "COMMENT"
               }
             </arguments>
           </parameters>
           <example>
             <use_mcp_tool>
               <server_name>github</server_name>
-              <tool_name>add_issue_comment</tool_name>
+              <tool_name>pull_request_review_write</tool_name>
               <arguments>
                 {
+                  "method": "create",
                   "owner": "your-org",
                   "repo": "your-repo",
-                  "issue_number": 38,
-                  "body": "## Unit Test Fixes\n\nI've fixed the failing unit tests..."
+                  "pullNumber": 38,
+                  "body": "## Unit Test Fixes\n\nI've fixed the failing unit tests...",
+                  "event": "COMMENT"
                 }
               </arguments>
             </use_mcp_tool>

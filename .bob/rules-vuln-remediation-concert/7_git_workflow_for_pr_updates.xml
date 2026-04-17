@@ -2,6 +2,10 @@
   <overview>
     Critical instructions for properly updating an existing PR with your vulnerability remediation fixes.
     This ensures the CI/CD workflow triggers correctly and test results are properly tracked.
+    
+    EXECUTION CONTEXTS:
+    1. Bob Shell (GitHub Actions): Branch name provided explicitly in workflow prompt
+    2. Bob IDE: Branch name extracted from PR metadata
   </overview>
 
   <critical_principle>
@@ -17,12 +21,85 @@
       <reason>The workflow can then assign reviewers based on test results</reason>
       <reason>Creating a new branch would create a separate PR, not update the existing one</reason>
     </why_this_matters>
+    
+    <bob_shell_emphasis>
+      <critical>
+        In bob-shell context (GitHub Actions), the workflow prompt EXPLICITLY provides
+        the branch name you must use. This takes absolute priority.
+        
+        Example prompt:
+        "Commit your fixes to the EXISTING PR branch: fix/cve-2023-12345-flask"
+        
+        You MUST use this exact branch name in all git commands.
+        Do NOT try to derive it from PR metadata if it's in the prompt.
+      </critical>
+    </bob_shell_emphasis>
   </critical_principle>
 
   <identifying_pr_branch>
     <title>Step 1: Identify the PR's Source Branch</title>
     
+    <priority_order>
+      <priority level="1">
+        <source>Workflow prompt (bob-shell context)</source>
+        <when>Prompt contains "Commit to branch" or "EXISTING PR branch:"</when>
+        <action>Extract and use the exact branch name from the prompt</action>
+        <example>
+          Prompt: "Commit your fixes to the EXISTING PR branch: fix/cve-2023-12345-flask"
+          → Use: fix/cve-2023-12345-flask
+        </example>
+        <critical>
+          This is the authoritative source in bob-shell context.
+          The workflow has already determined the correct branch.
+          Use it exactly as provided - no parsing, no modification.
+        </critical>
+      </priority>
+      
+      <priority level="2">
+        <source>PR metadata (bob-ide context or fallback)</source>
+        <when>Branch not explicitly provided in prompt</when>
+        <action>Extract from fetch_github_issue response</action>
+        <see_below>Details in "from_pr_metadata" section</see_below>
+      </priority>
+    </priority_order>
+    
+    <from_workflow_prompt>
+      <title>Extracting Branch from Workflow Prompt (Bob Shell)</title>
+      <description>
+        The bob-shell-v2.yml workflow provides the branch name explicitly in the prompt
+        to ensure you commit to the correct branch.
+      </description>
+      <patterns>
+        <pattern>"Commit your fixes to the EXISTING PR branch: [branch-name]"</pattern>
+        <pattern>"CRITICAL: Commit to branch '[branch-name]'"</pattern>
+        <pattern>"Push the changes" (after mentioning branch earlier)</pattern>
+      </patterns>
+      <extraction_example>
+        Full prompt:
+        "Fix the failing unit tests in PR #38.
+        
+        Follow this workflow:
+        1. Analyze the PR at https://github.com/org/repo/pull/38
+        2. Understand what package was upgraded and why tests are failing
+        3. Run the unit tests locally to see the exact failures
+        4. Fix the code to work with the upgraded package
+        5. Verify all tests pass
+        6. Commit your fixes to the EXISTING PR branch: fix/cve-2023-12345-flask
+        7. Push the changes
+        8. Add a comment to the PR documenting what was fixed
+        
+        CRITICAL: Commit to branch 'fix/cve-2023-12345-flask' - do NOT create a new branch!"
+        
+        Extracted branch: fix/cve-2023-12345-flask
+      </extraction_example>
+      <store>
+        Store this branch name immediately when you see it in the prompt.
+        You will use it in Step 2 for all git commands.
+      </store>
+    </from_workflow_prompt>
+    
     <from_pr_metadata>
+      <title>Extracting Branch from PR Metadata (Bob IDE or Fallback)</title>
       <description>
         When you fetch the PR via GitHub MCP or fetch_github_issue, the response includes
         the branch information in the PR metadata.
@@ -76,9 +153,14 @@
         <expected_output>fix/cve-2023-12345-flask</expected_output>
       </verify>
       <critical>
-        This MUST be the exact branch name from the PR metadata.
+        This MUST be the exact branch name from Step 1.
+        
+        In bob-shell context: Use the branch name from the workflow prompt
+        In bob-ide context: Use the branch name from PR metadata (head.ref)
+        
         Do NOT create a new branch with git checkout -b.
         Do NOT use a different branch name.
+        Do NOT modify or parse the branch name.
       </critical>
       <if_branch_not_exists>
         <scenario>Local branch doesn't exist yet</scenario>
@@ -259,25 +341,29 @@ Related to CVE-2024-12345"
       <action>Add a comment to the PR using GitHub MCP</action>
       <tool>use_mcp_tool</tool>
       <mcp_server>github</mcp_server>
-      <mcp_tool_name>add_issue_comment</mcp_tool_name>
+      <mcp_tool_name>pull_request_review_write</mcp_tool_name>
       
       <parameters>
+        <method>create</method>
         <owner>Extract from PR metadata (e.g., "your-org")</owner>
         <repo>Extract from PR metadata (e.g., "concert-bob-remediate")</repo>
-        <issue_number>The PR number (e.g., 38)</issue_number>
+        <pullNumber>The PR number (e.g., 38)</pullNumber>
         <body>Formatted markdown comment (see template below)</body>
+        <event>COMMENT</event>
       </parameters>
       
       <usage_example>
         <use_mcp_tool>
           <server_name>github</server_name>
-          <tool_name>add_issue_comment</tool_name>
+          <tool_name>pull_request_review_write</tool_name>
           <arguments>
             {
+              "method": "create",
               "owner": "your-org",
               "repo": "concert-bob-remediate",
-              "issue_number": 38,
-              "body": "## Unit Test Fixes\n\nI've fixed the failing unit tests caused by the Flask upgrade.\n\n### Changes Made\n- Updated import path from `flask.json` to `flask` in main.py\n- Modified test assertions to use `request.get_json()` instead of `request.json`\n\n### Root Cause\nThe upgrade from Flask v2.0.1 to v3.1.0 introduced these breaking changes:\n- `flask.json` module was removed\n- `request.json` property deprecated\n\n### Testing\n- All 3 unit tests now pass ✅\n- No regressions introduced\n- Security fix verified\n\n### Files Modified\n- `app/vulnerable/main.py`: Updated Flask imports\n- `app/vulnerable/test_main.py`: Updated test assertions\n\nReady for review!"
+              "pullNumber": 38,
+              "body": "## Unit Test Fixes\n\nI've fixed the failing unit tests caused by the Flask upgrade.\n\n### Changes Made\n- Updated import path from `flask.json` to `flask` in main.py\n- Modified test assertions to use `request.get_json()` instead of `request.json`\n\n### Root Cause\nThe upgrade from Flask v2.0.1 to v3.1.0 introduced these breaking changes:\n- `flask.json` module was removed\n- `request.json` property deprecated\n\n### Testing\n- All 3 unit tests now pass ✅\n- No regressions introduced\n- Security fix verified\n\n### Files Modified\n- `app/vulnerable/main.py`: Updated Flask imports\n- `app/vulnerable/test_main.py`: Updated test assertions\n\nReady for review!",
+              "event": "COMMENT"
             }
           </arguments>
         </use_mcp_tool>
@@ -406,7 +492,8 @@ Related to CVE-2024-12345"
     <title>Quick Reference: Correct Git Workflow</title>
 
     <checklist>
-      <item>✓ Identify PR branch from PR metadata (e.g., fix/cve-2023-12345-flask)</item>
+      <item>✓ Identify PR branch (Priority 1: from workflow prompt, Priority 2: from PR metadata)</item>
+      <item>✓ Store the exact branch name (e.g., fix/cve-2023-12345-flask)</item>
       <item>✓ Checkout that exact branch: git checkout [pr-branch]</item>
       <item>✓ Verify you're on correct branch: git branch --show-current</item>
       <item>✓ Stage your changes: git add [files]</item>
@@ -420,8 +507,11 @@ Related to CVE-2024-12345"
     </checklist>
 
     <command_sequence>
-      # 1. Identify branch from PR (e.g., fix/cve-2023-12345-flask)
-      # 2. Checkout the PR branch
+      # 1. Identify branch from workflow prompt or PR metadata
+      #    Example from prompt: "Commit to branch 'fix/cve-2023-12345-flask'"
+      #    Example from metadata: head.ref = "fix/cve-2023-12345-flask"
+      
+      # 2. Checkout the PR branch (use exact name from step 1)
       git checkout fix/cve-2023-12345-flask
       
       # 3. Verify you're on the right branch

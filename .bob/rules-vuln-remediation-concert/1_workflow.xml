@@ -2,6 +2,10 @@
   <overview>
     This workflow guides you through the complete process of remediating failing unit tests
     after a DevOps engineer has created a PR to fix a vulnerability (CVE patch or package upgrade).
+    
+    This mode is designed to work in two contexts:
+    1. Bob IDE: Interactive mode where user provides PR information
+    2. Bob Shell (GitHub Actions): Automated mode where workflow provides PR URL and branch
   </overview>
 
   <workflow_phases>
@@ -10,39 +14,88 @@
       <description>
         Identify the vulnerability remediation PR that needs attention
       </description>
+      
+      <context_detection>
+        <bob_shell_context>
+          <indicator>User message contains a PR URL from GitHub Actions workflow</indicator>
+          <indicator>Message includes explicit branch name to commit to</indicator>
+          <indicator>Message says "Fix the failing unit tests in PR #X"</indicator>
+          <action>Extract PR URL and branch name from the prompt, skip interactive discovery</action>
+        </bob_shell_context>
+        
+        <bob_ide_context>
+          <indicator>User asks "What are the GitHub PRs assigned to me?"</indicator>
+          <indicator>User provides PR number or URL interactively</indicator>
+          <action>Use interactive PR discovery workflow</action>
+        </bob_ide_context>
+      </context_detection>
+      
       <steps>
         <step number="1">
-          <action>Fetch assigned PRs from GitHub</action>
-          <tool>GitHub MCP - fetch_github_issue or list PRs</tool>
-          <details>
-            When user asks "What are the GitHub PRs assigned to me?", use GitHub MCP
-            to list all pull requests where you are assigned as a reviewer or assignee.
-          </details>
-          <example_query>
-            User: "What are the GitHub PRs assigned to me?"
-            Response: Use GitHub MCP to fetch PRs and present them in a clear list
-          </example_query>
+          <action>Determine context and extract PR information</action>
+          <bob_shell_workflow>
+            <when>Prompt contains "Fix the failing unit tests in PR #" and a GitHub URL</when>
+            <extract>
+              - PR URL from the prompt (e.g., https://github.com/org/repo/pull/123)
+              - PR branch name if explicitly provided (e.g., "Commit to branch 'fix/cve-xxx'")
+              - PR number from URL or prompt
+            </extract>
+            <proceed_to>Step 2 - Parse URL and use pull_request_read</proceed_to>
+          </bob_shell_workflow>
+          
+          <bob_ide_workflow>
+            <when>User asks about PRs or provides PR reference interactively</when>
+            <tool>GitHub MCP - search_pull_requests or pull_request_read</tool>
+            <details>
+              When user asks "What are the GitHub PRs assigned to me?", use search_pull_requests
+              with query "is:pr is:open assignee:@me"
+            </details>
+          </bob_ide_workflow>
         </step>
         
         <step number="2">
-          <action>Present PR options to user</action>
-          <details>
-            Display PRs with:
-            - PR number and title
-            - Author and creation date
-            - Current status (failing tests, etc.)
-            - Brief description of the vulnerability fix
-          </details>
+          <action>Fetch PR details using parsed URL components</action>
+          <tool>pull_request_read</tool>
+          <critical>
+            IMPORTANT: When the user's message contains a GitHub PR URL, you MUST:
+            1. Parse the URL to extract owner, repo, and pull number
+            2. Use pull_request_read with method="get"
+            3. Provide owner, repo, and pullNumber as separate parameters
+            
+            Example: If prompt says "Analyze the PR at https://github.com/org/repo/pull/123"
+            Parse to: owner="org", repo="repo", pullNumber=123
+            Then use:
+            <![CDATA[
+            <use_mcp_tool>
+            <server_name>github</server_name>
+            <tool_name>pull_request_read</tool_name>
+            <arguments>
+            {
+              "method": "get",
+              "owner": "org",
+              "repo": "repo",
+              "pullNumber": 123
+            }
+            </arguments>
+            </use_mcp_tool>
+            ]]>
+          </critical>
         </step>
         
         <step number="3">
-          <action>User selects PR to work on</action>
-          <details>
-            User will either:
-            - Specify PR number directly: "Review PR #123"
-            - Provide PR URL: "Review https://github.com/org/repo/pull/123"
-            - Select from the list you presented
-          </details>
+          <action>Extract PR branch name</action>
+          <from_workflow_prompt>
+            If the workflow prompt explicitly provides the branch name (e.g., "Commit to branch 'fix/cve-xxx'"),
+            store this branch name for later use in git commands.
+          </from_workflow_prompt>
+          <from_pr_metadata>
+            If not provided in prompt, extract from PR metadata:
+            - head.ref field contains the source branch name
+            - This is the branch you MUST commit to
+          </from_pr_metadata>
+          <store>
+            Remember this branch name - you will need it for all git operations
+          </store>
         </step>
       </steps>
     </phase>
@@ -56,14 +109,14 @@
       <steps>
         <step number="1">
           <action>Fetch PR details via GitHub MCP</action>
-          <tool>fetch_github_issue with PR URL</tool>
+          <tool>pull_request_read with method="get"</tool>
           <details>
             Retrieve:
             - PR description and comments
-            - Changed files list
-            - Diff of changes
-            - CI/CD test results
-            - Any linked issues or CVE references
+            - Changed files list (use method="get_files")
+            - Diff of changes (use method="get_diff")
+            - CI/CD test results (use method="get_check_runs")
+            - Branch information (response.head.ref)
           </details>
         </step>
         

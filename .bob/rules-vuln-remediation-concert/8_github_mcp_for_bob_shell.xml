@@ -1,0 +1,324 @@
+<github_mcp_for_bob_shell>
+  <overview>
+    Critical instructions for using GitHub MCP correctly in bob-shell (GitHub Actions) context.
+    This addresses common issues with GitHub MCP tool usage.
+  </overview>
+
+  <correct_github_mcp_tools>
+    <title>Available GitHub MCP Tools for Pull Requests</title>
+    
+    <tool name="pull_request_read">
+      <purpose>Get details for a single pull request</purpose>
+      <parameters>
+        <param name="method" required="true">Action: "get", "get_diff", "get_files", "get_comments", etc.</param>
+        <param name="owner" required="true">Repository owner (string)</param>
+        <param name="repo" required="true">Repository name (string)</param>
+        <param name="pullNumber" required="true">Pull request number (number)</param>
+      </parameters>
+    </tool>
+
+    <tool name="pull_request_review_write">
+      <purpose>Create reviews and comments on pull requests</purpose>
+      <parameters>
+        <param name="method" required="true">Write operation: "create", "submit", "delete"</param>
+        <param name="owner" required="true">Repository owner (string)</param>
+        <param name="repo" required="true">Repository name (string)</param>
+        <param name="pullNumber" required="true">Pull request number (number)</param>
+        <param name="body" required="false">Review comment text (string)</param>
+        <param name="event" required="false">Review action: "COMMENT", "APPROVE", "REQUEST_CHANGES"</param>
+      </parameters>
+    </tool>
+
+    <tool name="search_pull_requests">
+      <purpose>Search for pull requests across repositories</purpose>
+      <parameters>
+        <param name="query" required="true">Search query (e.g., "is:pr is:open assignee:@me")</param>
+      </parameters>
+    </tool>
+  </correct_github_mcp_tools>
+
+  <the_solution>
+    <title>Correct GitHub MCP Usage in Bob Shell</title>
+    
+    <critical_rule>
+      <rule_number>1</rule_number>
+      <rule>
+        When the workflow prompt contains a PR URL, you MUST:
+        1. Parse the URL to extract owner, repo, and pull number
+        2. Use pull_request_read with method="get"
+        3. Provide owner, repo, and pullNumber as separate parameters
+      </rule>
+      <never>Never try to use an issue_url parameter - it doesn't exist</never>
+      <never>Never use create_pull_request - the PR already exists</never>
+      <always>Always parse the URL and provide components separately</always>
+    </critical_rule>
+    
+    <correct_usage_example>
+      <scenario>
+        Workflow prompt says:
+        "Fix the failing unit tests in PR #38.
+        Analyze the PR at https://github.com/highorbit25/concert-bob-remediate/pull/38"
+      </scenario>
+      
+      <correct_approach>
+        <step>1. Parse the URL to extract: owner="highorbit25", repo="concert-bob-remediate", pullNumber=38</step>
+        <step>2. Use pull_request_read with method="get"</step>
+        <step>3. Provide owner, repo, and pullNumber as separate parameters</step>
+      </correct_approach>
+      
+      <url_parsing>
+        <regex>https://github\.com/([^/]+)/([^/]+)/pull/(\d+)</regex>
+        <extraction>
+          <owner>Group 1: highorbit25</owner>
+          <repo>Group 2: concert-bob-remediate</repo>
+          <pullNumber>Group 3: 38 (convert to number)</pullNumber>
+        </extraction>
+      </url_parsing>
+      
+      <correct_tool_use>
+        <![CDATA[
+<use_mcp_tool>
+<server_name>github</server_name>
+<tool_name>pull_request_read</tool_name>
+<arguments>
+{
+  "method": "get",
+  "owner": "highorbit25",
+  "repo": "concert-bob-remediate",
+  "pullNumber": 38
+}
+</arguments>
+</use_mcp_tool>
+        ]]>
+      </correct_tool_use>
+      
+      <why_this_works>
+        - pull_request_read is the correct tool for fetching PR details
+        - method="get" retrieves the full PR information
+        - Parsing the URL provides the required parameters
+        - pullNumber must be a number, not a string
+      </why_this_works>
+    </correct_usage_example>
+    
+    <incorrect_usage_examples>
+      <title>What NOT to Do</title>
+      
+      <wrong_example_1>
+        <description>Trying to use issue_url parameter</description>
+        <wrong_code>
+          <![CDATA[
+<!-- WRONG - This parameter doesn't exist -->
+<use_mcp_tool>
+<server_name>github</server_name>
+<tool_name>pull_request_read</tool_name>
+<arguments>
+{
+  "issue_url": "https://github.com/org/repo/pull/123"
+}
+</arguments>
+</use_mcp_tool>
+          ]]>
+        </wrong_code>
+        <why_wrong>
+          The pull_request_read tool does NOT have an issue_url parameter.
+          You must parse the URL and provide owner, repo, and pullNumber separately.
+        </why_wrong>
+      </wrong_example_1>
+      
+      <wrong_example_2>
+        <description>Trying to use other GitHub MCP tools incorrectly</description>
+        <wrong_code>
+          <![CDATA[
+<!-- WRONG - Don't do this -->
+<use_mcp_tool>
+<server_name>github</server_name>
+<tool_name>create_pull_request</tool_name>
+<arguments>
+{
+  "owner": "highorbit25",
+  "repo": "concert-bob-remediate",
+  "title": "Test PR",
+  "head": "test-branch",
+  "base": "main"
+}
+</arguments>
+</use_mcp_tool>
+          ]]>
+        </wrong_code>
+        <why_wrong>
+          You're trying to CREATE a new PR when you should be ANALYZING an existing one.
+          The workflow already created the PR - you just need to fetch and update it.
+        </why_wrong>
+      </wrong_example_2>
+    </incorrect_usage_examples>
+  </the_solution>
+
+  <workflow_integration>
+    <title>How This Fits Into the Workflow</title>
+    
+    <phase_1_pr_discovery>
+      <step>1. Workflow prompt provides PR URL</step>
+      <step>2. Parse URL to extract owner, repo, pullNumber</step>
+      <step>3. Use pull_request_read with method="get"</step>
+      <step>4. Receive PR metadata including branch name (response.head.ref)</step>
+      <step>5. Proceed with PR analysis</step>
+    </phase_1_pr_discovery>
+    
+    <phase_5_pr_update>
+      <step>1. Make code fixes and commit to PR branch</step>
+      <step>2. Push changes to update the PR</step>
+      <step>3. Use GitHub MCP to add comment to PR</step>
+      <step>4. Use pull_request_review_write with method="create"</step>
+    </phase_5_pr_update>
+    
+    <correct_comment_addition>
+      <description>Adding a comment to document your fixes</description>
+      <correct_tool_use>
+        <![CDATA[
+<use_mcp_tool>
+<server_name>github</server_name>
+<tool_name>pull_request_review_write</tool_name>
+<arguments>
+{
+  "method": "create",
+  "owner": "highorbit25",
+  "repo": "concert-bob-remediate",
+  "pullNumber": 38,
+  "body": "## Unit Test Fixes\n\nI've fixed the failing unit tests...",
+  "event": "COMMENT"
+}
+</arguments>
+</use_mcp_tool>
+        ]]>
+      </correct_tool_use>
+      <note>
+        Use pull_request_review_write with method="create" and event="COMMENT"
+        to add a comment to the PR.
+      </note>
+    </correct_comment_addition>
+  </workflow_integration>
+
+  <debugging_github_mcp_issues>
+    <title>Troubleshooting GitHub MCP Problems</title>
+    
+    <issue name="validation_failed">
+      <symptom>Error: "Validation Failed" or "field 'head' code 'invalid'"</symptom>
+      <likely_cause>
+        You're trying to use create_pull_request when you should be reading an existing PR.
+      </likely_cause>
+      <solution>
+        - For fetching PR: Use pull_request_read with method="get"
+        - For adding comments: Use pull_request_review_write with method="create"
+        - Never try to create a new PR - the workflow already created it
+      </solution>
+    </issue>
+    
+    <issue name="pr_not_found">
+      <symptom>Error: PR not found or cannot access</symptom>
+      <likely_cause>
+        Using issue_number without proper repository context, or
+        parsing the URL incorrectly.
+      </likely_cause>
+      <solution>
+        Use the full PR URL with issue_url parameter instead of trying
+        to extract components.
+      </solution>
+    </issue>
+    
+    <issue name="authentication_error">
+      <symptom>Error: Authentication failed or insufficient permissions</symptom>
+      <likely_cause>
+        GitHub MCP configuration issue or token permissions.
+      </likely_cause>
+      <solution>
+        This is a configuration issue, not a usage issue. The workflow
+        should have proper GitHub token configured in secrets.
+      </solution>
+    </issue>
+  </debugging_github_mcp_issues>
+
+  <quick_reference>
+    <title>Quick Reference: GitHub MCP in Bob Shell</title>
+    
+    <dos>
+      <do>✓ Parse PR URLs to extract owner, repo, and pullNumber</do>
+      <do>✓ Use pull_request_read with method="get" to fetch PR details</do>
+      <do>✓ Use pull_request_review_write with method="create" to add comments</do>
+      <do>✓ Extract branch name from PR metadata (response.head.ref)</do>
+      <do>✓ Commit to the existing PR branch to update it</do>
+    </dos>
+    
+    <donts>
+      <dont>✗ Don't try to create a new PR - it already exists</dont>
+      <dont>✗ Don't use issue_url parameter - it doesn't exist</dont>
+      <dont>✗ Don't use create_pull_request tool</dont>
+      <dont>✗ Don't create a new branch - use the existing PR branch</dont>
+      <dont>✗ Don't forget to convert pullNumber to a number type</dont>
+    </donts>
+    
+    <command_template>
+      <title>Correct Command Template</title>
+      <template>
+        <![CDATA[
+<!-- Step 1: Parse URL and fetch PR details -->
+<!-- URL: https://github.com/[org]/[repo]/pull/[number] -->
+<!-- Extract: owner=[org], repo=[repo], pullNumber=[number] -->
+
+<use_mcp_tool>
+<server_name>github</server_name>
+<tool_name>pull_request_read</tool_name>
+<arguments>
+{
+  "method": "get",
+  "owner": "[org]",
+  "repo": "[repo]",
+  "pullNumber": [number]
+}
+</arguments>
+</use_mcp_tool>
+
+<!-- Step 2: After making fixes and pushing, add comment -->
+<use_mcp_tool>
+<server_name>github</server_name>
+<tool_name>pull_request_review_write</tool_name>
+<arguments>
+{
+  "method": "create",
+  "owner": "[org]",
+  "repo": "[repo]",
+  "pullNumber": [number],
+  "body": "[your comment in markdown]",
+  "event": "COMMENT"
+}
+</arguments>
+</use_mcp_tool>
+        ]]>
+      </template>
+    </command_template>
+  </quick_reference>
+
+  <summary>
+    <title>Key Takeaways</title>
+    
+    <takeaway>
+      1. In bob-shell context, the workflow provides the PR URL directly
+    </takeaway>
+    <takeaway>
+      2. Parse PR URLs to extract owner, repo, and pullNumber
+    </takeaway>
+    <takeaway>
+      3. Use pull_request_read with method="get" to fetch PR details
+    </takeaway>
+    <takeaway>
+      4. Use pull_request_review_write with method="create" to add comments
+    </takeaway>
+    <takeaway>
+      5. Never try to create a new PR - you're updating an existing one
+    </takeaway>
+    <takeaway>
+      5. Commit to the existing PR branch to trigger workflow updates
+    </takeaway>
+  </summary>
+</github_mcp_for_bob_shell>
+
+<!-- Made with Bob -->

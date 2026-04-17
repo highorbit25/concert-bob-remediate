@@ -3,11 +3,51 @@
     This guide provides the complete end-to-end workflow for the vuln-remediation-concert mode,
     ensuring you follow all steps from PR discovery to successful remediation and PR update.
     This is the PRIMARY workflow guide that orchestrates all other instruction files.
+    
+    EXECUTION CONTEXTS:
+    1. Bob Shell (GitHub Actions): Automated execution via bob-shell-v2.yml workflow
+    2. Bob IDE: Interactive execution with user guidance
+    
+    The workflow adapts based on context while maintaining the same core remediation process.
   </overview>
+
+  <execution_context_detection>
+    <title>Detecting Execution Context</title>
+    
+    <bob_shell_indicators>
+      <indicator>Prompt contains "Fix the failing unit tests in PR #"</indicator>
+      <indicator>Prompt includes explicit PR URL (https://github.com/...)</indicator>
+      <indicator>Prompt specifies branch to commit to</indicator>
+      <indicator>Prompt says "CRITICAL: Commit to branch..."</indicator>
+    </bob_shell_indicators>
+    
+    <bob_ide_indicators>
+      <indicator>User asks conversational questions</indicator>
+      <indicator>User asks "What are the GitHub PRs assigned to me?"</indicator>
+      <indicator>User provides PR reference without full workflow context</indicator>
+    </bob_ide_indicators>
+    
+    <adaptation_strategy>
+      <bob_shell>
+        - Extract PR URL and branch name from prompt immediately
+        - Parse PR URL to extract owner, repo, and pullNumber
+        - Use pull_request_read with method="get"
+        - Skip interactive PR selection
+        - Proceed directly to PR analysis and testing
+      </bob_shell>
+      
+      <bob_ide>
+        - Use interactive PR discovery
+        - Ask clarifying questions as needed
+        - Guide user through the process
+        - Use ask_followup_question for decisions
+      </bob_ide>
+    </adaptation_strategy>
+  </execution_context_detection>
 
   <critical_workflow_principles>
     <principle name="always_analyze_pr_first">
-      <rule>ALWAYS start by analyzing the PR using GitHub MCP or fetch_github_issue tool</rule>
+      <rule>ALWAYS start by analyzing the PR using GitHub MCP pull_request_read tool</rule>
       <rationale>You must understand what vulnerability is being fixed and what changes were made</rationale>
       <never>Never skip PR analysis and jump straight to code changes</never>
     </principle>
@@ -45,13 +85,57 @@
       <mandatory>YES - Cannot skip this phase</mandatory>
 
       <step number="1.1">
-        <action>Fetch PR information</action>
-        <when>
-          - User asks "What are the GitHub PRs assigned to me?"
-          - User provides PR number: "Review PR #123"
-          - User provides PR URL: "Review https://github.com/org/repo/pull/123"
-        </when>
-        <tool>fetch_github_issue with appropriate parameters</tool>
+        <action>Fetch PR information based on context</action>
+        
+        <bob_shell_execution>
+          <when>Prompt contains PR URL and branch name from workflow</when>
+          <extract_from_prompt>
+            - PR URL (e.g., "Analyze the PR at https://github.com/org/repo/pull/123")
+            - Branch name (e.g., "Commit to branch 'fix/cve-2023-12345'")
+            - PR number (from URL or explicit mention)
+          </extract_from_prompt>
+          <tool>pull_request_read</tool>
+          <parameters>method, owner, repo, pullNumber</parameters>
+          <example>
+            Prompt: "Fix the failing unit tests in PR #38. Analyze the PR at https://github.com/highorbit25/concert-bob-remediate/pull/38"
+            
+            Step 1: Parse URL
+            - owner = "highorbit25"
+            - repo = "concert-bob-remediate"
+            - pullNumber = 38
+            
+            Step 2: Use pull_request_read
+            <![CDATA[
+            <use_mcp_tool>
+            <server_name>github</server_name>
+            <tool_name>pull_request_read</tool_name>
+            <arguments>
+            {
+              "method": "get",
+              "owner": "highorbit25",
+              "repo": "concert-bob-remediate",
+              "pullNumber": 38
+            }
+            </arguments>
+            </use_mcp_tool>
+            ]]>
+          </example>
+          <critical>
+            You MUST parse the URL to extract owner, repo, and pullNumber.
+            There is NO issue_url parameter - components must be provided separately.
+          </critical>
+        </bob_shell_execution>
+        
+        <bob_ide_execution>
+          <when>
+            - User asks "What are the GitHub PRs assigned to me?"
+            - User provides PR number: "Review PR #123"
+            - User provides PR URL interactively
+          </when>
+          <tool>search_pull_requests or pull_request_read with appropriate parameters</tool>
+          <interactive>May need to ask user which PR to work on</interactive>
+        </bob_ide_execution>
+        
         <output>
           Present PR details including:
           - PR number and title
@@ -59,6 +143,7 @@
           - Package being upgraded (old version → new version)
           - Current test status (passing/failing)
           - Number of failing tests if available
+          - Source branch name (head.ref from metadata)
         </output>
       </step>
 
@@ -342,15 +427,36 @@
 
       <step number="5.0">
         <action>Identify the PR's source branch</action>
-        <how>
-          From the PR metadata you fetched earlier, extract the head branch name.
-          This is typically shown as: "author wants to merge from [branch-name] into main"
-        </how>
-        <example>
-          PR #38: "highorbit25 wants to merge from fix/cve-2023-12345-flask"
-          → Branch to commit to: fix/cve-2023-12345-flask
-        </example>
-        <store>Remember this branch name for the git commands</store>
+        
+        <bob_shell_context>
+          <priority>1 - Use branch from workflow prompt if provided</priority>
+          <how>
+            The bob-shell-v2.yml workflow explicitly provides the branch name in the prompt.
+            Look for: "Commit your fixes to the EXISTING PR branch: [branch-name]"
+          </how>
+          <example>
+            Prompt: "Commit your fixes to the EXISTING PR branch: fix/cve-2023-12345-flask"
+            → Branch to use: fix/cve-2023-12345-flask
+          </example>
+          <critical>
+            This branch name is authoritative. Use it exactly as provided.
+            Do NOT try to derive it from PR metadata if explicitly given in prompt.
+          </critical>
+        </bob_shell_context>
+        
+        <bob_ide_context>
+          <priority>2 - Extract from PR metadata if not in prompt</priority>
+          <how>
+            From the PR metadata you fetched earlier, extract the head branch name.
+            This is typically shown as: "author wants to merge from [branch-name] into main"
+          </how>
+          <example>
+            PR #38: "highorbit25 wants to merge from fix/cve-2023-12345-flask"
+            → Branch to commit to: fix/cve-2023-12345-flask
+          </example>
+        </bob_ide_context>
+        
+        <store>Remember this branch name for all git commands</store>
       </step>
 
       <step number="5.1">
@@ -406,18 +512,20 @@
       <step number="5.3">
         <action>Add comment to PR documenting the fixes</action>
         <tool>use_mcp_tool with github server</tool>
-        <mcp_tool>add_issue_comment</mcp_tool>
+        <mcp_tool>pull_request_review_write</mcp_tool>
         
         <how_to_use>
           <use_mcp_tool>
             <server_name>github</server_name>
-            <tool_name>add_issue_comment</tool_name>
+            <tool_name>pull_request_review_write</tool_name>
             <arguments>
               {
+                "method": "create",
                 "owner": "[extract from PR metadata]",
                 "repo": "[extract from PR metadata]",
-                "issue_number": [pr-number],
-                "body": "[formatted comment - see template below]"
+                "pullNumber": [pr-number],
+                "body": "[formatted comment - see template below]",
+                "event": "COMMENT"
               }
             </arguments>
           </use_mcp_tool>
@@ -452,13 +560,15 @@
         <example>
           <use_mcp_tool>
             <server_name>github</server_name>
-            <tool_name>add_issue_comment</tool_name>
+            <tool_name>pull_request_review_write</tool_name>
             <arguments>
               {
+                "method": "create",
                 "owner": "your-org",
                 "repo": "concert-bob-remediate",
-                "issue_number": 38,
-                "body": "## Unit Test Fixes\n\nI've fixed the failing unit tests caused by the Flask upgrade.\n\n### Changes Made\n- Updated import path from `flask.json` to `flask` in main.py\n- Modified test assertions to use `request.get_json()` instead of `request.json`\n\n### Root Cause\nThe upgrade from Flask v2.0.1 to v3.1.0 introduced these breaking changes:\n- `flask.json` module was removed, functionality moved to main `flask` module\n- `request.json` property deprecated in favor of `request.get_json()` method\n\n### Testing\n- All 3 unit tests now pass ✅\n- No regressions introduced\n- Security fix (CVE-2024-12345) verified and maintained\n\n### Files Modified\n- `app/vulnerable/main.py`: Updated Flask imports and request handling\n- `app/vulnerable/test_main.py`: Updated test assertions for new API\n\nReady for review!"
+                "pullNumber": 38,
+                "body": "## Unit Test Fixes\n\nI've fixed the failing unit tests caused by the Flask upgrade.\n\n### Changes Made\n- Updated import path from `flask.json` to `flask` in main.py\n- Modified test assertions to use `request.get_json()` instead of `request.json`\n\n### Root Cause\nThe upgrade from Flask v2.0.1 to v3.1.0 introduced these breaking changes:\n- `flask.json` module was removed, functionality moved to main `flask` module\n- `request.json` property deprecated in favor of `request.get_json()` method\n\n### Testing\n- All 3 unit tests now pass ✅\n- No regressions introduced\n- Security fix (CVE-2024-12345) verified and maintained\n\n### Files Modified\n- `app/vulnerable/main.py`: Updated Flask imports and request handling\n- `app/vulnerable/test_main.py`: Updated test assertions for new API\n\nReady for review!",
+                "event": "COMMENT"
               }
             </arguments>
           </use_mcp_tool>
