@@ -1,272 +1,120 @@
 <github_integration>
   <overview>
-    Guidelines for using GitHub MCP to interact with pull requests, fetch PR details,
-    and manage the vulnerability remediation workflow through GitHub.
-    
-    CRITICAL FOR BOB SHELL: When running in GitHub Actions (bob-shell), the workflow
-    provides the PR URL directly in the prompt. You MUST parse this URL and use
-    pull_request_read with the extracted components.
+    Guidelines for using GitHub MCP to interact with pull requests in the bob-shell automated workflow.
+    The workflow prompt provides the PR URL and branch name explicitly.
   </overview>
 
-  <github_mcp_usage_contexts>
-    <title>Two Usage Contexts</title>
+  <github_mcp_tools>
+    <title>GitHub MCP Tools for Bob Shell</title>
     
-    <bob_shell_context>
-      <description>Running in GitHub Actions via bob-shell-v2.yml workflow</description>
-      <characteristics>
-        <item>Prompt contains explicit PR URL (e.g., "Analyze the PR at https://github.com/...")</item>
-        <item>Prompt specifies the branch to commit to</item>
-        <item>Automated, non-interactive execution</item>
-      </characteristics>
-      <github_mcp_usage>
-        <critical>
-          ALWAYS parse the PR URL and use pull_request_read with method="get".
-          
-          Example prompt: "Analyze the PR at https://github.com/org/repo/pull/123"
-          
-          Step 1: Parse URL
-          - owner = "org"
-          - repo = "repo"
-          - pullNumber = 123
-          
-          Step 2: Use pull_request_read
-          <![CDATA[
-          <use_mcp_tool>
+    <tool name="pull_request_read">
+      <description>Fetch pull request details</description>
+      <parameters>
+        <parameter name="method" required="true">Always use "get"</parameter>
+        <parameter name="owner" required="true">Repository owner from parsed PR URL</parameter>
+        <parameter name="repo" required="true">Repository name from parsed PR URL</parameter>
+        <parameter name="pullNumber" required="true">PR number from parsed PR URL</parameter>
+      </parameters>
+      <usage_example>
+        <use_mcp_tool>
           <server_name>github</server_name>
           <tool_name>pull_request_read</tool_name>
           <arguments>
-          {
-            "method": "get",
-            "owner": "org",
-            "repo": "repo",
-            "pullNumber": 123
-          }
-          </arguments>
-          </use_mcp_tool>
-          ]]>
-          
-          NEVER try to use issue_url parameter - it doesn't exist.
-        </critical>
-      </github_mcp_usage>
-    </bob_shell_context>
-    
-    <bob_ide_context>
-      <description>Running interactively in Bob IDE</description>
-      <characteristics>
-        <item>User asks "What are the GitHub PRs assigned to me?"</item>
-        <item>User provides PR number: "Review PR #123"</item>
-        <item>Interactive, conversational execution</item>
-      </characteristics>
-      <github_mcp_usage>
-        Use search_pull_requests with query "is:pr is:open assignee:@me"
-        for interactive PR discovery and selection.
-      </github_mcp_usage>
-    </bob_ide_context>
-  </github_mcp_usage_contexts>
-
-  <github_mcp_capabilities>
-    <title>Available GitHub MCP Operations</title>
-    
-    <capability name="fetch_assigned_prs">
-      <description>
-        Retrieve pull requests assigned to the user
-      </description>
-      <use_cases>
-        <use_case>List all PRs where user is assigned as reviewer</use_case>
-        <use_case>Find vulnerability remediation PRs</use_case>
-        <use_case>Check PR status and CI results</use_case>
-      </use_cases>
-      <typical_workflow>
-        User asks: "What are the GitHub PRs assigned to me?"
-        You use GitHub MCP to fetch and display the list
-      </typical_workflow>
-    </capability>
-    
-    <capability name="fetch_pr_details">
-      <description>
-        Get detailed information about a specific pull request
-      </description>
-      <information_retrieved>
-        <item>PR title and description</item>
-        <item>Author and creation date</item>
-        <item>Changed files and diffs</item>
-        <item>Comments and review feedback</item>
-        <item>CI/CD status checks</item>
-        <item>Linked issues</item>
-        <item>Labels and milestones</item>
-      </information_retrieved>
-    </capability>
-    
-    <capability name="read_pr_diff">
-      <description>
-        Access the code changes in the pull request
-      </description>
-      <what_to_analyze>
-        <item>Dependency file changes (requirements.txt, package.json, etc.)</item>
-        <item>Code modifications made by DevOps engineer</item>
-        <item>Test file updates</item>
-        <item>Configuration changes</item>
-        <item>Documentation updates</item>
-      </what_to_analyze>
-    </capability>
-    
-    <capability name="fetch_linked_issues">
-      <description>
-        Retrieve issues linked to the PR
-      </description>
-      <value>
-        Issues often contain:
-        - CVE details and context
-        - Security advisory information
-        - Discussion about the vulnerability
-        - Remediation requirements
-      </value>
-    </capability>
-  </github_mcp_capabilities>
-
-  <pr_discovery_workflow>
-    <title>Discovering and Selecting PRs</title>
-    
-    <scenario name="user_asks_for_assigned_prs">
-      <user_query>What are the GitHub PRs assigned to me?</user_query>
-      
-      <response_steps>
-        <step number="1">
-          <action>Use GitHub MCP to fetch assigned PRs</action>
-          <tool>fetch_github_issue or equivalent MCP tool</tool>
-        </step>
-        
-        <step number="2">
-          <action>Filter for relevant PRs</action>
-          <criteria>
-            - PRs with failing tests
-            - PRs related to security/CVE fixes
-            - PRs where you're assigned as reviewer
-            - Open PRs (not merged or closed)
-          </criteria>
-        </step>
-        
-        <step number="3">
-          <action>Present PRs in clear format</action>
-          <format>
-            ## Pull Requests Assigned to You
-            
-            ### PR #123: Upgrade Flask to fix CVE-2023-12345
-            - **Status**: ❌ Tests Failing
-            - **Author**: devops-engineer
-            - **Created**: 2 days ago
-            - **Changes**: requirements.txt (Flask 2.0.1 → 2.3.3)
-            - **Failing Tests**: 5 tests in test_app.py
-            
-            ### PR #124: Update dependencies for security
-            - **Status**: ✅ Tests Passing
-            - **Author**: security-team
-            - **Created**: 1 week ago
-            - **Changes**: Multiple package upgrades
-          </format>
-        </step>
-        
-        <step number="4">
-          <action>Ask user which PR to work on</action>
-          <use_tool>ask_followup_question</use_tool>
-          <suggestions>
-            <suggest>Review PR #123 and fix failing tests</suggest>
-            <suggest>Show me details of PR #123</suggest>
-            <suggest>List all failing tests in PR #123</suggest>
-          </suggestions>
-        </step>
-      </response_steps>
-    </scenario>
-    
-    <scenario name="user_provides_pr_number">
-      <user_query>Review PR #123 and fix the failing unit tests</user_query>
-      
-      <response_steps>
-        <step number="1">
-          <action>Extract PR number from user message</action>
-          <pattern>PR #(\d+)</pattern>
-        </step>
-        
-        <step number="2">
-          <action>Fetch PR details via GitHub MCP</action>
-          <details_to_extract>
-            - PR title and description
-            - Changed files
-            - Diff content
-            - CI status
-            - Comments
-          </details_to_extract>
-        </step>
-        
-        <step number="3">
-          <action>Proceed with PR analysis workflow</action>
-          <reference>See 2_pr_analysis.xml for detailed steps</reference>
-        </step>
-      </response_steps>
-    </scenario>
-    
-    <scenario name="user_provides_pr_url">
-      <user_query>Review https://github.com/org/repo/pull/123</user_query>
-      <or>Analyze the PR at https://github.com/org/repo/pull/123</or>
-      
-      <response_steps>
-        <step number="1">
-          <action>Extract the FULL GitHub URL from the prompt</action>
-          <pattern>https://github\.com/[^/]+/[^/]+/pull/\d+</pattern>
-          <critical>
-            Do NOT parse the URL into components.
-            Do NOT extract just the PR number.
-            Use the COMPLETE URL as-is.
-          </critical>
-        </step>
-        
-        <step number="2">
-          <action>Parse URL and use pull_request_read</action>
-          <tool>pull_request_read</tool>
-          <parameters>method, owner, repo, pullNumber</parameters>
-          <example>
-            <![CDATA[
-            <use_mcp_tool>
-            <server_name>github</server_name>
-            <tool_name>pull_request_read</tool_name>
-            <arguments>
             {
               "method": "get",
               "owner": "highorbit25",
               "repo": "concert-bob-remediate",
               "pullNumber": 38
             }
-            </arguments>
-            </use_mcp_tool>
-            ]]>
-          </example>
-          <critical>
-            You MUST parse the URL to extract owner, repo, and pullNumber.
-            There is NO issue_url parameter in pull_request_read.
-          </critical>
-        </step>
-        
-        <step number="3">
-          <action>Extract PR metadata from response</action>
-          <extract>
-            - PR number (from response)
-            - head.ref (source branch name)
-            - base.ref (target branch, usually main)
-            - PR title and description
-            - Changed files
-          </extract>
-        </step>
-        
-        <step number="4">
-          <action>Continue with standard PR analysis</action>
-          <reference>See 2_pr_analysis.xml</reference>
-        </step>
-      </response_steps>
-    </scenario>
-  </pr_discovery_workflow>
+          </arguments>
+        </use_mcp_tool>
+      </usage_example>
+      <returns>
+        <item>PR title and description</item>
+        <item>Changed files list</item>
+        <item>Diff content</item>
+        <item>CI/CD status checks</item>
+        <item>Comments and reviews</item>
+        <item>Linked issues</item>
+      </returns>
+    </tool>
+    
+    <tool name="pull_request_review_write">
+      <description>Add a comment to the pull request</description>
+      <parameters>
+        <parameter name="method" required="true">Always use "create"</parameter>
+        <parameter name="owner" required="true">Repository owner from parsed PR URL</parameter>
+        <parameter name="repo" required="true">Repository name from parsed PR URL</parameter>
+        <parameter name="pullNumber" required="true">PR number from parsed PR URL</parameter>
+        <parameter name="event" required="true">Always use "COMMENT"</parameter>
+        <parameter name="body" required="true">Markdown-formatted comment text</parameter>
+      </parameters>
+      <usage_example>
+        <use_mcp_tool>
+          <server_name>github</server_name>
+          <tool_name>pull_request_review_write</tool_name>
+          <arguments>
+            {
+              "method": "create",
+              "owner": "highorbit25",
+              "repo": "concert-bob-remediate",
+              "pullNumber": 38,
+              "event": "COMMENT",
+              "body": "## Unit Test Fixes\n\nI've fixed the failing unit tests caused by the Flask upgrade.\n\n### Changes Made\n- Updated import paths\n- Fixed API calls\n\n### Testing\n- All tests now pass ✅"
+            }
+          </arguments>
+        </use_mcp_tool>
+      </usage_example>
+    </tool>
+  </github_mcp_tools>
+
+  <pr_url_parsing>
+    <title>Parsing PR URL from Workflow Prompt</title>
+    
+    <workflow_prompt_structure>
+      <description>
+        The workflow prompt contains the PR URL in step 1:
+        "1. Analyze the PR at https://github.com/{org}/{repo}/pull/{number}"
+      </description>
+    </workflow_prompt_structure>
+    
+    <parsing_steps>
+      <step number="1">
+        <action>Extract the full PR URL from step 1</action>
+        <pattern>https://github\.com/([^/]+)/([^/]+)/pull/(\d+)</pattern>
+        <example>
+          Input: "1. Analyze the PR at https://github.com/highorbit25/concert-bob-remediate/pull/38"
+          Extract: https://github.com/highorbit25/concert-bob-remediate/pull/38
+        </example>
+      </step>
+      
+      <step number="2">
+        <action>Parse URL components</action>
+        <components>
+          <component name="owner">Organization or user name (e.g., "highorbit25")</component>
+          <component name="repo">Repository name (e.g., "concert-bob-remediate")</component>
+          <component name="pullNumber">PR number as integer (e.g., 38)</component>
+        </components>
+        <example>
+          From: https://github.com/highorbit25/concert-bob-remediate/pull/38
+          Parse:
+          - owner: "highorbit25"
+          - repo: "concert-bob-remediate"
+          - pullNumber: 38
+        </example>
+      </step>
+      
+      <step number="3">
+        <action>Store parsed components for GitHub MCP calls</action>
+        <usage>
+          Use these components in all subsequent GitHub MCP tool calls
+        </usage>
+      </step>
+    </parsing_steps>
+  </pr_url_parsing>
 
   <pr_information_extraction>
-    <title>Extracting Key Information from PRs</title>
+    <title>Extracting Key Information from PR</title>
     
     <extraction_checklist>
       <section name="basic_info">
@@ -274,7 +122,7 @@
         <item>PR title</item>
         <item>Author</item>
         <item>Creation date</item>
-        <item>Current status (open/closed/merged)</item>
+        <item>Current status</item>
       </section>
       
       <section name="security_context">
@@ -294,15 +142,8 @@
       <section name="test_status">
         <item>CI/CD check results</item>
         <item>Number of failing tests</item>
-        <item>Test failure messages (if available)</item>
+        <item>Test failure messages</item>
         <item>Build status</item>
-      </section>
-      
-      <section name="context">
-        <item>PR description/body</item>
-        <item>Comments from reviewers</item>
-        <item>Linked issues</item>
-        <item>Related PRs</item>
       </section>
     </extraction_checklist>
     
@@ -321,15 +162,6 @@
         <pattern name="issue_reference">
           <regex>#\d+|Fixes #\d+|Closes #\d+</regex>
           <example>Fixes #456</example>
-        </pattern>
-        
-        <pattern name="breaking_changes">
-          <keywords>
-            - "Breaking changes"
-            - "BREAKING"
-            - "Migration required"
-            - "API changes"
-          </keywords>
         </pattern>
       </common_patterns>
     </parsing_pr_description>
@@ -379,406 +211,142 @@
         </analyze>
       </step>
     </diff_reading_strategy>
-    
-    <diff_interpretation>
-      <green_lines>
-        <meaning>Added lines (new code)</meaning>
-        <significance>
-          - New imports
-          - New function calls
-          - New configuration
-          - Additions made by DevOps engineer
-        </significance>
-      </green_lines>
-      
-      <red_lines>
-        <meaning>Removed lines (deleted code)</meaning>
-        <significance>
-          - Old imports removed
-          - Deprecated code removed
-          - Old configuration removed
-          - What the DevOps engineer thought needed changing
-        </significance>
-      </red_lines>
-      
-      <context_lines>
-        <meaning>Unchanged lines shown for context</meaning>
-        <use>
-          Understand the surrounding code and how changes fit in
-        </use>
-      </context_lines>
-    </diff_interpretation>
   </pr_diff_analysis>
-
-  <ci_status_interpretation>
-    <title>Understanding CI/CD Check Results</title>
-    
-    <status_types>
-      <status name="failing_tests">
-        <indicator>❌ Tests Failed</indicator>
-        <meaning>Unit tests are not passing</meaning>
-        <action>This is what you need to fix</action>
-      </status>
-      
-      <status name="build_failure">
-        <indicator>❌ Build Failed</indicator>
-        <meaning>Code doesn't compile or dependencies can't be installed</meaning>
-        <action>May need to fix build issues before tests</action>
-      </status>
-      
-      <status name="linting_errors">
-        <indicator>❌ Lint Failed</indicator>
-        <meaning>Code style or quality issues</meaning>
-        <action>May need to address after fixing tests</action>
-      </status>
-      
-      <status name="pending">
-        <indicator>⏳ Pending</indicator>
-        <meaning>Checks haven't completed yet</meaning>
-        <action>Wait for results or check locally</action>
-      </status>
-      
-      <status name="passing">
-        <indicator>✅ Passed</indicator>
-        <meaning>This check is successful</meaning>
-        <action>No action needed for this check</action>
-      </status>
-    </status_types>
-    
-    <interpreting_test_results>
-      <information_available>
-        <item>Total number of tests run</item>
-        <item>Number of tests passed</item>
-        <item>Number of tests failed</item>
-        <item>Test execution time</item>
-        <item>Sometimes: specific failing test names</item>
-      </information_available>
-      
-      <what_to_look_for>
-        <item>How many tests are failing</item>
-        <item>Are failures in specific test files</item>
-        <item>Did tests pass before the PR</item>
-        <item>Are there any error messages visible</item>
-      </what_to_look_for>
-    </interpreting_test_results>
-  </ci_status_interpretation>
-
-  <pr_comments_analysis>
-    <title>Learning from PR Comments</title>
-    
-    <valuable_comments>
-      <type name="devops_notes">
-        <description>
-          DevOps engineer explaining what they tried or what's known
-        </description>
-        <example>
-          "I upgraded Flask but the tests are failing due to API changes.
-          Need help fixing the application code."
-        </example>
-        <value>
-          Tells you what's already been attempted and what's needed
-        </value>
-      </type>
-      
-      <type name="reviewer_feedback">
-        <description>
-          Other reviewers pointing out issues or suggestions
-        </description>
-        <example>
-          "The import statements need updating for the new Flask version"
-        </example>
-        <value>
-          May provide hints about what needs fixing
-        </value>
-      </type>
-      
-      <type name="bot_comments">
-        <description>
-          Automated comments from CI/CD or security bots
-        </description>
-        <example>
-          "Security vulnerability CVE-2023-12345 will be fixed by this upgrade"
-        </example>
-        <value>
-          Confirms the security context and purpose
-        </value>
-      </type>
-    </valuable_comments>
-  </pr_comments_analysis>
-
-  <linked_issues_analysis>
-    <title>Analyzing Linked Issues</title>
-    
-    <why_check_issues>
-      <reason>Issues often contain more context than the PR</reason>
-      <reason>May include CVE details and security advisories</reason>
-      <reason>Could have discussion about remediation approach</reason>
-      <reason>Might list known breaking changes</reason>
-    </why_check_issues>
-    
-    <what_to_extract>
-      <item>CVE description and severity</item>
-      <item>Affected functionality</item>
-      <item>Recommended remediation steps</item>
-      <item>Known breaking changes</item>
-      <item>Timeline or urgency</item>
-      <item>Related vulnerabilities</item>
-    </what_to_extract>
-    
-    <issue_patterns>
-      <pattern name="security_advisory">
-        <title_pattern>Security: CVE-YYYY-XXXXX in [package]</title_pattern>
-        <contains>
-          - CVE details
-          - Vulnerability description
-          - Affected versions
-          - Fixed versions
-          - Workarounds if any
-        </contains>
-      </pattern>
-      
-      <pattern name="upgrade_tracking">
-        <title_pattern>Upgrade [package] to [version]</title_pattern>
-        <contains>
-          - Reason for upgrade
-          - Expected changes
-          - Migration notes
-          - Testing requirements
-        </contains>
-      </pattern>
-    </issue_patterns>
-  </linked_issues_analysis>
 
   <pr_update_workflow>
     <title>Updating PR After Fixes</title>
     
-    <critical_principle>
-      <rule>ALWAYS commit changes to the EXISTING PR branch, NEVER create a new branch</rule>
-      <rationale>
-        The PR already exists with a specific branch. Committing to that branch will:
-        - Trigger the CI/CD workflow automatically
-        - Update the PR with your fixes
-        - Allow the workflow to re-run tests and assign reviewers
-      </rationale>
-      <never>Never create a new branch like "pr-38" or "fix-tests"</never>
-      <always>Always use the branch name from the PR metadata (e.g., "fix/cve-2023-12345-flask")</always>
-      
-      <bob_shell_workflow>
-        <additional_rule>
-          In bob-shell context, the workflow prompt explicitly provides the branch name.
-          Example: "Commit your fixes to the EXISTING PR branch: fix/cve-2023-12345-flask"
-          
-          You MUST use this exact branch name in all git commands.
-        </additional_rule>
-      </bob_shell_workflow>
-    </critical_principle>
-    
-    <preparation>
-      <step number="0">
-        <action>Identify the PR's source branch</action>
-        <how>
-          From the PR metadata fetched via GitHub MCP, extract:
-          - head.ref (the branch name)
-          - head.repo (the repository, usually same as base)
-        </how>
+    <branch_extraction>
+      <description>
+        The workflow prompt provides the branch name in step 6:
+        "6. Commit your fixes to the EXISTING PR branch: {branch-name}"
+      </description>
+      <parsing>
+        <pattern>Commit your fixes to the EXISTING PR branch: (.+)</pattern>
         <example>
-          If PR shows: "highorbit25 wants to merge 1 commit into main from fix/cve-2023-12345-flask"
-          Then the branch is: fix/cve-2023-12345-flask
+          Input: "6. Commit your fixes to the EXISTING PR branch: fix/cve-2023-12345-flask"
+          Extract: fix/cve-2023-12345-flask
         </example>
-        <critical>This is the branch you MUST commit to</critical>
-      </step>
-      
-      <step number="1">
-        <action>Verify all tests pass locally</action>
-        <command>Run full test suite</command>
-      </step>
-      
-      <step number="2">
-        <action>Review all changes made</action>
-        <tool>obtain_git_diff</tool>
-      </step>
-      
-      <step number="3">
-        <action>Prepare commit message</action>
-        <format>
-          fix: resolve unit test failures after [package] upgrade
-          
-          - Fixed import paths for [package] v[version]
-          - Updated API calls to match new signatures
-          - Replaced deprecated methods with recommended alternatives
-          
-          Addresses failing tests in PR #[number]
-          Related to CVE-[id]
-        </format>
-      </step>
-    </preparation>
+      </parsing>
+      <critical>
+        This is the ONLY branch name you should use for git operations.
+        Never create a new branch or use a different branch name.
+      </critical>
+    </branch_extraction>
     
     <commit_and_push>
       <step number="1">
-        <action>Ensure you're on the correct branch</action>
-        <command>git checkout [pr-branch-name]</command>
+        <action>Checkout the PR branch</action>
+        <command>git checkout {pr_branch_from_workflow_prompt}</command>
         <example>git checkout fix/cve-2023-12345-flask</example>
-        <verify>git branch --show-current</verify>
-        <critical>
-          Use the EXACT branch name from the PR, not a new branch name.
-          This ensures your commit updates the existing PR.
-        </critical>
       </step>
       
       <step number="2">
         <action>Stage changes</action>
-        <command>git add [files]</command>
+        <command>git add {modified_files}</command>
         <example>git add app/vulnerable/main.py app/vulnerable/test_main.py</example>
       </step>
       
       <step number="3">
         <action>Commit with clear message</action>
-        <command>git commit -m "message"</command>
-        <example>
-          git commit -m "fix: resolve unit test failures after Flask upgrade
-
-- Fixed import paths for Flask v3.1.0
-- Updated test assertions to match new behavior
-
-Addresses failing tests in PR #38
-Related to CVE-2024-12345"
-        </example>
+        <command>git commit -m "{message}"</command>
+        <message_format>
+          fix: resolve unit test failures after {package} upgrade
+          
+          - {change_1}
+          - {change_2}
+          
+          Addresses failing tests in PR #{pr_number}
+          Related to CVE-{cve_id}
+        </message_format>
       </step>
       
       <step number="4">
-        <action>Push to the PR branch</action>
-        <command>git push origin [pr-branch-name]</command>
+        <action>Push to PR branch</action>
+        <command>git push origin {pr_branch_from_workflow_prompt}</command>
         <example>git push origin fix/cve-2023-12345-flask</example>
         <result>
           This will:
           - Update the PR with your commit
-          - Trigger the CI/CD workflow (.github/workflows/pr-unit-test.yml)
-          - Re-run the unit tests
-          - Automatically assign reviewers based on test results
+          - Trigger the CI/CD workflow
+          - Re-run unit tests
+          - Assign reviewers based on test results
         </result>
-        <critical>
-          The branch name MUST match the PR's head branch exactly.
-          Do NOT push to a different branch or create a new PR.
-        </critical>
       </step>
     </commit_and_push>
     
     <pr_comment>
       <when>After pushing fixes to the PR branch</when>
-      <purpose>Document what was fixed and why for the PR reviewers</purpose>
-      <how>Use GitHub MCP to add a comment to the PR</how>
-      <tool>use_mcp_tool with github server and pull_request_review_write tool</tool>
+      <purpose>Document what was fixed for PR reviewers</purpose>
+      <how>Use GitHub MCP pull_request_review_write tool</how>
       
-      <step_by_step>
-        <step number="1">
-          <action>Prepare the comment content</action>
-          <use_template>See template below</use_template>
-        </step>
-        
-        <step number="2">
-          <action>Add comment to PR using GitHub MCP</action>
-          <tool>use_mcp_tool</tool>
-          <parameters>
-            <server_name>github</server_name>
-            <tool_name>pull_request_review_write</tool_name>
-            <arguments>
-              {
-                "method": "create",
-                "owner": "[repo-owner]",
-                "repo": "[repo-name]",
-                "pullNumber": [pr-number],
-                "body": "[comment-content]",
-                "event": "COMMENT"
-              }
-            </arguments>
-          </parameters>
-          <example>
-            <use_mcp_tool>
-              <server_name>github</server_name>
-              <tool_name>pull_request_review_write</tool_name>
-              <arguments>
-                {
-                  "method": "create",
-                  "owner": "your-org",
-                  "repo": "your-repo",
-                  "pullNumber": 38,
-                  "body": "## Unit Test Fixes\n\nI've fixed the failing unit tests...",
-                  "event": "COMMENT"
-                }
-              </arguments>
-            </use_mcp_tool>
-          </example>
-        </step>
-      </step_by_step>
+      <implementation>
+        <use_mcp_tool>
+          <server_name>github</server_name>
+          <tool_name>pull_request_review_write</tool_name>
+          <arguments>
+            {
+              "method": "create",
+              "owner": "{owner_from_parsed_url}",
+              "repo": "{repo_from_parsed_url}",
+              "pullNumber": {pr_number_from_parsed_url},
+              "event": "COMMENT",
+              "body": "{formatted_comment}"
+            }
+          </arguments>
+        </use_mcp_tool>
+      </implementation>
       
-      <template>
+      <comment_template>
         ## Unit Test Fixes
         
-        I've fixed the failing unit tests caused by the [package] upgrade.
+        I've fixed the failing unit tests caused by the {package} upgrade.
         
         ### Changes Made
-        - Updated import statements in [files]
-        - Modified API calls to match new [package] v[version] signatures
-        - Replaced deprecated `old_method()` with `new_method()`
+        - {specific_change_1}
+        - {specific_change_2}
         
         ### Root Cause
-        The upgrade from v[old] to v[new] introduced these breaking changes:
-        - [Breaking change 1]
-        - [Breaking change 2]
+        The upgrade from v{old} to v{new} introduced these breaking changes:
+        - {breaking_change_1}
+        - {breaking_change_2}
         
         ### Testing
-        - All [N] unit tests now pass ✅
+        - All {N} unit tests now pass ✅
         - No regressions introduced
         - Security fix verified and maintained
         
         ### Files Modified
-        - `[file1]`: [reason]
-        - `[file2]`: [reason]
+        - `{file1}`: {reason}
+        - `{file2}`: {reason}
         
         Ready for review!
-      </template>
-      
-      <why_this_matters>
-        <reason>Documents the remediation work for reviewers</reason>
-        <reason>Explains the root cause of test failures</reason>
-        <reason>Shows what was changed and why</reason>
-        <reason>Confirms all tests now pass</reason>
-        <reason>Provides context for the Software Lead review</reason>
-      </why_this_matters>
+      </comment_template>
     </pr_comment>
   </pr_update_workflow>
 
   <best_practices>
     <title>GitHub Integration Best Practices</title>
     
-    <practice name="clear_communication">
-      <principle>Communicate clearly with PR author and reviewers</principle>
-      <guidelines>
-        <guideline>Explain what you fixed and why</guideline>
-        <guideline>Reference documentation or migration guides</guideline>
-        <guideline>Note any decisions or trade-offs made</guideline>
-        <guideline>Ask questions if anything is unclear</guideline>
-      </guidelines>
+    <practice name="always_parse_from_prompt">
+      <principle>Always extract PR URL and branch from the workflow prompt</principle>
+      <rationale>
+        The workflow provides these explicitly - don't try to discover or infer them
+      </rationale>
     </practice>
     
-    <practice name="respect_pr_scope">
-      <principle>Stay within the scope of the PR</principle>
-      <guidelines>
-        <guideline>Fix only test failures related to the upgrade</guideline>
-        <guideline>Don't add unrelated features or refactoring</guideline>
-        <guideline>Don't change the security fix itself</guideline>
-        <guideline>Keep changes minimal and focused</guideline>
-      </guidelines>
+    <practice name="use_exact_branch_name">
+      <principle>Use the exact branch name from step 6 of the workflow prompt</principle>
+      <rationale>
+        This ensures the PR is updated correctly and triggers the CI/CD workflow
+      </rationale>
     </practice>
     
-    <practice name="document_decisions">
-      <principle>Document why you made specific choices</principle>
-      <guidelines>
-        <guideline>Explain non-obvious fixes in code comments</guideline>
-        <guideline>Link to relevant documentation</guideline>
-        <guideline>Note any alternative approaches considered</guideline>
-        <guideline>Highlight any potential concerns</guideline>
-      </guidelines>
+    <practice name="document_thoroughly">
+      <principle>Provide detailed documentation in the PR comment</principle>
+      <rationale>
+        Reviewers need to understand what was fixed, why, and that tests pass
+      </rationale>
     </practice>
     
     <practice name="verify_before_pushing">
@@ -786,44 +354,11 @@ Related to CVE-2024-12345"
       <checklist>
         <item>All tests pass</item>
         <item>No new warnings or errors</item>
-        <item>Code compiles/builds successfully</item>
         <item>Changes are minimal and targeted</item>
         <item>Commit message is clear</item>
       </checklist>
     </practice>
   </best_practices>
-
-  <troubleshooting>
-    <title>Common GitHub Integration Issues</title>
-    
-    <issue name="cannot_fetch_pr">
-      <symptom>GitHub MCP fails to fetch PR details</symptom>
-      <possible_causes>
-        <cause>Invalid PR number or URL</cause>
-        <cause>PR is in a private repository without access</cause>
-        <cause>GitHub API rate limiting</cause>
-        <cause>Network connectivity issues</cause>
-      </possible_causes>
-      <solutions>
-        <solution>Verify PR number/URL is correct</solution>
-        <solution>Check repository access permissions</solution>
-        <solution>Wait and retry if rate limited</solution>
-        <solution>Ask user to provide PR details manually</solution>
-      </solutions>
-    </issue>
-    
-    <issue name="pr_info_incomplete">
-      <symptom>Some PR information is missing</symptom>
-      <possible_causes>
-        <cause>PR is very large with many changes</cause>
-        <cause>Some information not available via API</cause>
-        <cause>Permissions limiting what can be accessed</cause>
-      </possible_causes>
-      <solutions>
-        <solution>Ask user for specific missing information</solution>
-        <solution>Check PR directly on GitHub web interface</solution>
-        <solution>Work with available information</solution>
-      </solutions>
-    </issue>
-  </troubleshooting>
 </github_integration>
+
+<!-- Made with Bob -->

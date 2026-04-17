@@ -1,171 +1,80 @@
 <git_workflow_for_pr_updates>
   <overview>
-    Critical instructions for properly updating an existing PR with your vulnerability remediation fixes.
-    This ensures the CI/CD workflow triggers correctly and test results are properly tracked.
-    
-    EXECUTION CONTEXTS:
-    1. Bob Shell (GitHub Actions): Branch name provided explicitly in workflow prompt
-    2. Bob IDE: Branch name extracted from PR metadata
+    Critical instructions for properly updating an existing PR with vulnerability remediation fixes
+    in the bob-shell automated workflow. The workflow prompt provides the exact branch name to use.
   </overview>
 
   <critical_principle>
-    <title>ALWAYS Commit to the Existing PR Branch</title>
+    <title>ALWAYS Use the Branch Name from Workflow Prompt</title>
     <rule>
-      When fixing unit tests for an existing PR, you MUST commit your changes to the
-      PR's existing source branch, NOT create a new branch.
+      The workflow prompt explicitly provides the branch name in step 6:
+      "6. Commit your fixes to the EXISTING PR branch: {branch_name}"
+      
+      You MUST use this exact branch name for all git operations.
     </rule>
     <why_this_matters>
-      <reason>The PR is already created and linked to a specific branch</reason>
-      <reason>Committing to that branch automatically updates the PR</reason>
+      <reason>The PR is already created and linked to this specific branch</reason>
+      <reason>Committing to this branch automatically updates the PR</reason>
       <reason>This triggers the CI/CD workflow to re-run tests</reason>
-      <reason>The workflow can then assign reviewers based on test results</reason>
-      <reason>Creating a new branch would create a separate PR, not update the existing one</reason>
+      <reason>The workflow assigns reviewers based on test results</reason>
+      <reason>Using a different branch would not update the PR</reason>
     </why_this_matters>
-    
-    <bob_shell_emphasis>
-      <critical>
-        In bob-shell context (GitHub Actions), the workflow prompt EXPLICITLY provides
-        the branch name you must use. This takes absolute priority.
-        
-        Example prompt:
-        "Commit your fixes to the EXISTING PR branch: fix/cve-2023-12345-flask"
-        
-        You MUST use this exact branch name in all git commands.
-        Do NOT try to derive it from PR metadata if it's in the prompt.
-      </critical>
-    </bob_shell_emphasis>
   </critical_principle>
 
-  <identifying_pr_branch>
-    <title>Step 1: Identify the PR's Source Branch</title>
+  <extracting_branch_name>
+    <title>Step 1: Extract Branch Name from Workflow Prompt</title>
     
-    <priority_order>
-      <priority level="1">
-        <source>Workflow prompt (bob-shell context)</source>
-        <when>Prompt contains "Commit to branch" or "EXISTING PR branch:"</when>
-        <action>Extract and use the exact branch name from the prompt</action>
-        <example>
-          Prompt: "Commit your fixes to the EXISTING PR branch: fix/cve-2023-12345-flask"
-          → Use: fix/cve-2023-12345-flask
-        </example>
-        <critical>
-          This is the authoritative source in bob-shell context.
-          The workflow has already determined the correct branch.
-          Use it exactly as provided - no parsing, no modification.
-        </critical>
-      </priority>
+    <workflow_prompt_structure>
+      <description>
+        Step 6 of the workflow prompt contains the branch name:
+        "6. Commit your fixes to the EXISTING PR branch: {branch-name}"
+      </description>
+    </workflow_prompt_structure>
+    
+    <parsing_steps>
+      <step number="1">
+        <action>Locate step 6 in the workflow prompt</action>
+        <pattern>6\. Commit your fixes to the EXISTING PR branch: (.+)</pattern>
+      </step>
       
-      <priority level="2">
-        <source>PR metadata (bob-ide context or fallback)</source>
-        <when>Branch not explicitly provided in prompt</when>
-        <action>Extract from fetch_github_issue response</action>
-        <see_below>Details in "from_pr_metadata" section</see_below>
-      </priority>
-    </priority_order>
-    
-    <from_workflow_prompt>
-      <title>Extracting Branch from Workflow Prompt (Bob Shell)</title>
-      <description>
-        The bob-shell-v2.yml workflow provides the branch name explicitly in the prompt
-        to ensure you commit to the correct branch.
-      </description>
-      <patterns>
-        <pattern>"Commit your fixes to the EXISTING PR branch: [branch-name]"</pattern>
-        <pattern>"CRITICAL: Commit to branch '[branch-name]'"</pattern>
-        <pattern>"Push the changes" (after mentioning branch earlier)</pattern>
-      </patterns>
-      <extraction_example>
-        Full prompt:
-        "Fix the failing unit tests in PR #38.
-        
-        Follow this workflow:
-        1. Analyze the PR at https://github.com/org/repo/pull/38
-        2. Understand what package was upgraded and why tests are failing
-        3. Run the unit tests locally to see the exact failures
-        4. Fix the code to work with the upgraded package
-        5. Verify all tests pass
-        6. Commit your fixes to the EXISTING PR branch: fix/cve-2023-12345-flask
-        7. Push the changes
-        8. Add a comment to the PR documenting what was fixed
-        
-        CRITICAL: Commit to branch 'fix/cve-2023-12345-flask' - do NOT create a new branch!"
-        
-        Extracted branch: fix/cve-2023-12345-flask
-      </extraction_example>
-      <store>
-        Store this branch name immediately when you see it in the prompt.
-        You will use it in Step 2 for all git commands.
-      </store>
-    </from_workflow_prompt>
-    
-    <from_pr_metadata>
-      <title>Extracting Branch from PR Metadata (Bob IDE or Fallback)</title>
-      <description>
-        When you fetch the PR via GitHub MCP or fetch_github_issue, the response includes
-        the branch information in the PR metadata.
-      </description>
-      <look_for>
-        <field name="head.ref">The branch name (e.g., "fix/cve-2023-12345-flask")</field>
-        <field name="head.repo">The repository (usually same as base)</field>
-        <field name="head.user">The user who created the branch</field>
-      </look_for>
-      <example>
-        PR #38 metadata shows:
-        - head.ref: "fix/cve-2023-12345-flask"
-        - base.ref: "main"
-        
-        This means:
-        - Source branch: fix/cve-2023-12345-flask
-        - Target branch: main
-        - You must commit to: fix/cve-2023-12345-flask
-      </example>
-    </from_pr_metadata>
-
-    <from_pr_description>
-      <description>
-        PR descriptions typically show the branch merge information
-      </description>
-      <pattern>
-        "[user] wants to merge [N] commit(s) into [base] from [head-branch]"
-      </pattern>
-      <example>
-        "highorbit25 wants to merge 1 commit into main from fix/cve-2023-12345-flask"
-        
-        Extract: fix/cve-2023-12345-flask
-      </example>
-    </from_pr_description>
-
-    <store_branch_name>
-      <action>Remember this branch name for all subsequent git commands</action>
-      <variable>pr_branch = "fix/cve-2023-12345-flask"</variable>
-    </store_branch_name>
-  </identifying_pr_branch>
+      <step number="2">
+        <action>Extract the branch name</action>
+        <example>
+          Input: "6. Commit your fixes to the EXISTING PR branch: fix/cve-2023-12345-flask"
+          Extract: fix/cve-2023-12345-flask
+        </example>
+      </step>
+      
+      <step number="3">
+        <action>Store branch name for git commands</action>
+        <usage>
+          Use this exact branch name in all subsequent git operations
+        </usage>
+      </step>
+    </parsing_steps>
+  </extracting_branch_name>
 
   <git_workflow_steps>
     <title>Step 2: Execute Git Commands to Update PR</title>
 
     <step number="1" name="checkout_pr_branch">
-      <action>Switch to the PR's source branch</action>
-      <command>git checkout [pr-branch-name]</command>
+      <action>Switch to the PR branch</action>
+      <command>git checkout {pr_branch_from_workflow_prompt}</command>
       <example>git checkout fix/cve-2023-12345-flask</example>
+      <tool>execute_command</tool>
       <verify>
         <command>git branch --show-current</command>
         <expected_output>fix/cve-2023-12345-flask</expected_output>
       </verify>
       <critical>
-        This MUST be the exact branch name from Step 1.
-        
-        In bob-shell context: Use the branch name from the workflow prompt
-        In bob-ide context: Use the branch name from PR metadata (head.ref)
-        
+        This MUST be the exact branch name from step 6 of the workflow prompt.
         Do NOT create a new branch with git checkout -b.
         Do NOT use a different branch name.
-        Do NOT modify or parse the branch name.
       </critical>
       <if_branch_not_exists>
         <scenario>Local branch doesn't exist yet</scenario>
-        <command>git fetch origin [pr-branch-name]</command>
-        <then>git checkout [pr-branch-name]</then>
+        <command>git fetch origin {pr_branch_name}</command>
+        <then>git checkout {pr_branch_name}</then>
         <example>
           git fetch origin fix/cve-2023-12345-flask
           git checkout fix/cve-2023-12345-flask
@@ -176,7 +85,7 @@
     <step number="2" name="verify_branch">
       <action>Confirm you're on the correct branch</action>
       <command>git branch --show-current</command>
-      <must_match>The PR's head branch name exactly</must_match>
+      <must_match>The branch name from step 6 of the workflow prompt</must_match>
       <if_wrong_branch>
         <error>You're on the wrong branch!</error>
         <fix>Go back to step 1 and checkout the correct branch</fix>
@@ -185,9 +94,10 @@
 
     <step number="3" name="stage_changes">
       <action>Stage your fixed files</action>
-      <command>git add [file1] [file2] ...</command>
+      <command>git add {file1} {file2} ...</command>
       <example>git add app/vulnerable/main.py app/vulnerable/test_main.py</example>
       <alternative>git add .</alternative>
+      <tool>execute_command</tool>
       <verify>
         <command>git status</command>
         <check>Verify the correct files are staged</check>
@@ -196,16 +106,17 @@
 
     <step number="4" name="commit_changes">
       <action>Commit with a clear, descriptive message</action>
-      <command>git commit -m "[message]"</command>
+      <command>git commit -m "{message}"</command>
+      <tool>execute_command</tool>
       <message_format>
-        fix: resolve unit test failures after [package] upgrade
+        fix: resolve unit test failures after {package} upgrade
 
-        - [Specific change 1]
-        - [Specific change 2]
-        - [Specific change 3]
+        - {Specific change 1}
+        - {Specific change 2}
+        - {Specific change 3}
 
-        Addresses failing tests in PR #[number]
-        Related to CVE-[id]
+        Addresses failing tests in PR #{number}
+        Related to CVE-{id}
       </message_format>
       <example>
         git commit -m "fix: resolve unit test failures after Flask upgrade
@@ -220,11 +131,12 @@ Related to CVE-2024-12345"
     </step>
 
     <step number="5" name="push_to_pr_branch">
-      <action>Push to the PR's source branch</action>
-      <command>git push origin [pr-branch-name]</command>
+      <action>Push to the PR branch</action>
+      <command>git push origin {pr_branch_from_workflow_prompt}</command>
       <example>git push origin fix/cve-2023-12345-flask</example>
+      <tool>execute_command</tool>
       <critical>
-        The branch name MUST match the PR's head branch exactly.
+        The branch name MUST match the branch from step 6 of the workflow prompt exactly.
         This is the most critical step - pushing to the correct branch updates the PR.
       </critical>
       <what_happens>
@@ -249,24 +161,15 @@ Related to CVE-2024-12345"
     <title>Step 3: Verify PR Was Updated</title>
 
     <check number="1">
-      <what>PR shows your new commit</what>
-      <how>View the PR on GitHub and check the commits tab</how>
-      <expected>Your commit message appears in the PR's commit history</expected>
+      <what>Push command succeeded</what>
+      <how>Check execute_command output</how>
+      <expected>No errors, successful push message</expected>
     </check>
 
     <check number="2">
-      <what>CI/CD workflow triggered</what>
-      <how>Check the PR's "Checks" tab or Actions tab</how>
-      <expected>pr-unit-test.yml workflow is running or completed</expected>
-    </check>
-
-    <check number="3">
-      <what>Test results updated</what>
-      <how>Wait for workflow to complete and check results</how>
-      <expected>
-        - If tests pass: ✅ All checks passed
-        - If tests fail: ❌ Tests failed (need more fixes)
-      </expected>
+      <what>Commit is on the correct branch</what>
+      <how>Verify branch name matches workflow prompt</how>
+      <expected>Branch name from step 6 of workflow prompt</expected>
     </check>
   </verification>
 
@@ -274,29 +177,29 @@ Related to CVE-2024-12345"
     <title>Common Mistakes to Avoid</title>
 
     <mistake name="creating_new_branch">
-      <description>Creating a new branch instead of using the PR's branch</description>
+      <description>Creating a new branch instead of using the workflow-provided branch</description>
       <wrong_command>git checkout -b pr-38</wrong_command>
       <why_wrong>
         This creates a completely new branch that's not connected to the PR.
         Pushing this would require creating a new PR, not updating the existing one.
       </why_wrong>
       <correct_approach>
-        Use git checkout [existing-pr-branch] to switch to the PR's branch
+        Use git checkout {branch_from_workflow_prompt} to switch to the PR's branch
       </correct_approach>
     </mistake>
 
     <mistake name="wrong_branch_name">
-      <description>Using a different branch name than the PR's head branch</description>
+      <description>Using a different branch name than provided in the workflow prompt</description>
       <wrong_example>
-        PR branch: fix/cve-2023-12345-flask
-        You push to: fix-tests or main
+        Workflow provides: fix/cve-2023-12345-flask
+        You use: fix-tests or main
       </wrong_example>
       <why_wrong>
         The PR is tracking a specific branch. Pushing to a different branch
         won't update the PR.
       </why_wrong>
       <correct_approach>
-        Always use the exact branch name from the PR metadata
+        Always use the exact branch name from step 6 of the workflow prompt
       </correct_approach>
     </mistake>
 
@@ -310,7 +213,7 @@ Related to CVE-2024-12345"
         - Doesn't update the PR
       </why_wrong>
       <correct_approach>
-        Always push to the PR's source branch, never to main
+        Always push to the PR branch from the workflow prompt, never to main
       </correct_approach>
     </mistake>
 
@@ -321,131 +224,11 @@ Related to CVE-2024-12345"
         The PR branch exists on the remote but not in your local repository
       </why_happens>
       <solution>
-        <command>git fetch origin [pr-branch-name]</command>
-        <then>git checkout [pr-branch-name]</then>
+        <command>git fetch origin {pr_branch_name}</command>
+        <then>git checkout {pr_branch_name}</then>
       </solution>
     </mistake>
   </common_mistakes>
-  <pr_documentation>
-    <title>Step 3: Document Your Fixes in the PR</title>
-    
-    <why_document>
-      <reason>Reviewers need to understand what was fixed and why</reason>
-      <reason>Creates a permanent record of the remediation work</reason>
-      <reason>Explains the root cause of test failures</reason>
-      <reason>Shows that all tests now pass</reason>
-      <reason>Provides context for the Software Lead review</reason>
-    </why_document>
-    
-    <how_to_document>
-      <action>Add a comment to the PR using GitHub MCP</action>
-      <tool>use_mcp_tool</tool>
-      <mcp_server>github</mcp_server>
-      <mcp_tool_name>pull_request_review_write</mcp_tool_name>
-      
-      <parameters>
-        <method>create</method>
-        <owner>Extract from PR metadata (e.g., "your-org")</owner>
-        <repo>Extract from PR metadata (e.g., "concert-bob-remediate")</repo>
-        <pullNumber>The PR number (e.g., 38)</pullNumber>
-        <body>Formatted markdown comment (see template below)</body>
-        <event>COMMENT</event>
-      </parameters>
-      
-      <usage_example>
-        <use_mcp_tool>
-          <server_name>github</server_name>
-          <tool_name>pull_request_review_write</tool_name>
-          <arguments>
-            {
-              "method": "create",
-              "owner": "your-org",
-              "repo": "concert-bob-remediate",
-              "pullNumber": 38,
-              "body": "## Unit Test Fixes\n\nI've fixed the failing unit tests caused by the Flask upgrade.\n\n### Changes Made\n- Updated import path from `flask.json` to `flask` in main.py\n- Modified test assertions to use `request.get_json()` instead of `request.json`\n\n### Root Cause\nThe upgrade from Flask v2.0.1 to v3.1.0 introduced these breaking changes:\n- `flask.json` module was removed\n- `request.json` property deprecated\n\n### Testing\n- All 3 unit tests now pass ✅\n- No regressions introduced\n- Security fix verified\n\n### Files Modified\n- `app/vulnerable/main.py`: Updated Flask imports\n- `app/vulnerable/test_main.py`: Updated test assertions\n\nReady for review!",
-              "event": "COMMENT"
-            }
-          </arguments>
-        </use_mcp_tool>
-      </usage_example>
-    </how_to_document>
-    
-    <comment_template>
-      ## Unit Test Fixes
-      
-      I've fixed the failing unit tests caused by the [package] upgrade.
-      
-      ### Changes Made
-      - [Specific change 1 with file name]
-      - [Specific change 2 with file name]
-      - [Specific change 3 with file name]
-      
-      ### Root Cause
-      The upgrade from v[old] to v[new] introduced these breaking changes:
-      - [Breaking change 1]
-      - [Breaking change 2]
-      
-      ### Testing
-      - All [N] unit tests now pass ✅
-      - No regressions introduced
-      - Security fix verified and maintained
-      
-      ### Files Modified
-      - `[file1]`: [reason for change]
-      - `[file2]`: [reason for change]
-      
-      Ready for review!
-    </comment_template>
-    
-    <formatting_tips>
-      <tip>Use markdown formatting for clarity</tip>
-      <tip>Use ✅ emoji to indicate success</tip>
-      <tip>Use backticks for file names and code</tip>
-      <tip>Be specific about what changed and why</tip>
-      <tip>Link to documentation if relevant</tip>
-    </formatting_tips>
-  </pr_documentation>
-
-  <verification>
-    <title>Step 4: Verify PR Was Updated</title>
-
-    <check number="1">
-      <what>PR shows your new commit</what>
-      <how>View the PR on GitHub and check the commits tab</how>
-      <expected>Your commit message appears in the PR's commit history</expected>
-    </check>
-
-    <check number="2">
-      <what>Your comment appears on the PR</what>
-      <how>View the PR conversation tab</how>
-      <expected>Your documentation comment is visible with all the details</expected>
-    </check>
-
-    <check number="3">
-      <what>CI/CD workflow triggered</what>
-      <how>Check the PR's "Checks" tab or Actions tab</how>
-      <expected>pr-unit-test.yml workflow is running or completed</expected>
-    </check>
-
-    <check number="4">
-      <what>Test results updated</what>
-      <how>Wait for workflow to complete and check results</how>
-      <expected>
-        - If tests pass: ✅ All checks passed
-        - If tests fail: ❌ Tests failed (need more fixes)
-      </expected>
-    </check>
-    
-    <check number="5">
-      <what>Reviewer assignment</what>
-      <how>Check PR assignees/reviewers</how>
-      <expected>
-        - If tests pass: Software Lead requested for review
-        - If tests fail: SWE assigned for more fixes
-      </expected>
-    </check>
-  </verification>
-
 
   <workflow_integration>
     <title>How This Integrates with the CI/CD Workflow</title>
@@ -492,26 +275,18 @@ Related to CVE-2024-12345"
     <title>Quick Reference: Correct Git Workflow</title>
 
     <checklist>
-      <item>✓ Identify PR branch (Priority 1: from workflow prompt, Priority 2: from PR metadata)</item>
-      <item>✓ Store the exact branch name (e.g., fix/cve-2023-12345-flask)</item>
-      <item>✓ Checkout that exact branch: git checkout [pr-branch]</item>
+      <item>✓ Extract branch name from step 6 of workflow prompt</item>
+      <item>✓ Checkout that exact branch: git checkout {pr_branch}</item>
       <item>✓ Verify you're on correct branch: git branch --show-current</item>
-      <item>✓ Stage your changes: git add [files]</item>
+      <item>✓ Stage your changes: git add {files}</item>
       <item>✓ Commit with clear message: git commit -m "..."</item>
-      <item>✓ Push to PR branch: git push origin [pr-branch]</item>
-      <item>✓ Add documentation comment to PR using GitHub MCP</item>
-      <item>✓ Verify PR updated on GitHub</item>
-      <item>✓ Verify comment appears on PR</item>
-      <item>✓ Wait for CI/CD workflow to run</item>
-      <item>✓ Check reviewer assignment based on test results</item>
+      <item>✓ Push to PR branch: git push origin {pr_branch}</item>
+      <item>✓ Verify push succeeded</item>
     </checklist>
 
     <command_sequence>
-      # 1. Identify branch from workflow prompt or PR metadata
-      #    Example from prompt: "Commit to branch 'fix/cve-2023-12345-flask'"
-      #    Example from metadata: head.ref = "fix/cve-2023-12345-flask"
-      
-      # 2. Checkout the PR branch (use exact name from step 1)
+      # 1. Extract branch from workflow prompt step 6 (e.g., fix/cve-2023-12345-flask)
+      # 2. Checkout the PR branch
       git checkout fix/cve-2023-12345-flask
       
       # 3. Verify you're on the right branch

@@ -1,101 +1,59 @@
 <vulnerability_remediation_workflow>
   <overview>
-    This workflow guides you through the complete process of remediating failing unit tests
-    after a DevOps engineer has created a PR to fix a vulnerability (CVE patch or package upgrade).
-    
-    This mode is designed to work in two contexts:
-    1. Bob IDE: Interactive mode where user provides PR information
-    2. Bob Shell (GitHub Actions): Automated mode where workflow provides PR URL and branch
+    This workflow guides you through fixing failing unit tests after a DevOps engineer has created
+    a PR to fix a vulnerability (CVE patch or package upgrade). This mode is designed for automated
+    execution via bob-shell in GitHub Actions workflows.
   </overview>
 
+  <workflow_context>
+    <execution_environment>bob-shell (GitHub Actions)</execution_environment>
+    <trigger>GitHub Actions workflow after unit tests fail on a vulnerability remediation PR</trigger>
+    <input_format>
+      The workflow prompt provides:
+      - PR number in the first line: "Fix the failing unit tests in PR #[number]"
+      - PR URL in step 1: "https://github.com/[org]/[repo]/pull/[number]"
+      - PR branch name in step 6: "Commit your fixes to the EXISTING PR branch: [branch-name]"
+    </input_format>
+  </workflow_context>
+
   <workflow_phases>
-    <phase number="1" name="pr_discovery">
-      <title>Discover and Select PR</title>
+    <phase number="1" name="parse_workflow_prompt">
+      <title>Parse Workflow Prompt for PR Details</title>
       <description>
-        Identify the vulnerability remediation PR that needs attention
+        Extract PR URL and branch name from the workflow prompt provided by GitHub Actions
       </description>
-      
-      <context_detection>
-        <bob_shell_context>
-          <indicator>User message contains a PR URL from GitHub Actions workflow</indicator>
-          <indicator>Message includes explicit branch name to commit to</indicator>
-          <indicator>Message says "Fix the failing unit tests in PR #X"</indicator>
-          <action>Extract PR URL and branch name from the prompt, skip interactive discovery</action>
-        </bob_shell_context>
-        
-        <bob_ide_context>
-          <indicator>User asks "What are the GitHub PRs assigned to me?"</indicator>
-          <indicator>User provides PR number or URL interactively</indicator>
-          <action>Use interactive PR discovery workflow</action>
-        </bob_ide_context>
-      </context_detection>
-      
       <steps>
         <step number="1">
-          <action>Determine context and extract PR information</action>
-          <bob_shell_workflow>
-            <when>Prompt contains "Fix the failing unit tests in PR #" and a GitHub URL</when>
-            <extract>
-              - PR URL from the prompt (e.g., https://github.com/org/repo/pull/123)
-              - PR branch name if explicitly provided (e.g., "Commit to branch 'fix/cve-xxx'")
-              - PR number from URL or prompt
-            </extract>
-            <proceed_to>Step 2 - Parse URL and use pull_request_read</proceed_to>
-          </bob_shell_workflow>
-          
-          <bob_ide_workflow>
-            <when>User asks about PRs or provides PR reference interactively</when>
-            <tool>GitHub MCP - search_pull_requests or pull_request_read</tool>
-            <details>
-              When user asks "What are the GitHub PRs assigned to me?", use search_pull_requests
-              with query "is:pr is:open assignee:@me"
-            </details>
-          </bob_ide_workflow>
+          <action>Extract PR URL from workflow prompt</action>
+          <pattern>Step 1 contains: "Analyze the PR at https://github.com/[org]/[repo]/pull/[number]"</pattern>
+          <extract>
+            <pr_url>Full GitHub PR URL</pr_url>
+            <owner>Organization or user name</owner>
+            <repo>Repository name</repo>
+            <pr_number>Pull request number</pr_number>
+          </extract>
+          <example>
+            From: "1. Analyze the PR at https://github.com/highorbit25/concert-bob-remediate/pull/38"
+            Extract:
+            - owner: highorbit25
+            - repo: concert-bob-remediate
+            - pr_number: 38
+          </example>
         </step>
         
         <step number="2">
-          <action>Fetch PR details using parsed URL components</action>
-          <tool>pull_request_read</tool>
+          <action>Extract PR branch name from workflow prompt</action>
+          <pattern>Step 6 contains: "Commit your fixes to the EXISTING PR branch: [branch-name]"</pattern>
+          <extract>
+            <pr_branch>The exact branch name to commit to</pr_branch>
+          </extract>
+          <example>
+            From: "6. Commit your fixes to the EXISTING PR branch: fix/cve-2023-12345-flask"
+            Extract: fix/cve-2023-12345-flask
+          </example>
           <critical>
-            IMPORTANT: When the user's message contains a GitHub PR URL, you MUST:
-            1. Parse the URL to extract owner, repo, and pull number
-            2. Use pull_request_read with method="get"
-            3. Provide owner, repo, and pullNumber as separate parameters
-            
-            Example: If prompt says "Analyze the PR at https://github.com/org/repo/pull/123"
-            Parse to: owner="org", repo="repo", pullNumber=123
-            Then use:
-            <![CDATA[
-            <use_mcp_tool>
-            <server_name>github</server_name>
-            <tool_name>pull_request_read</tool_name>
-            <arguments>
-            {
-              "method": "get",
-              "owner": "org",
-              "repo": "repo",
-              "pullNumber": 123
-            }
-            </arguments>
-            </use_mcp_tool>
-            ]]>
+            This branch name MUST be used for all git operations. Never create a new branch.
           </critical>
-        </step>
-        
-        <step number="3">
-          <action>Extract PR branch name</action>
-          <from_workflow_prompt>
-            If the workflow prompt explicitly provides the branch name (e.g., "Commit to branch 'fix/cve-xxx'"),
-            store this branch name for later use in git commands.
-          </from_workflow_prompt>
-          <from_pr_metadata>
-            If not provided in prompt, extract from PR metadata:
-            - head.ref field contains the source branch name
-            - This is the branch you MUST commit to
-          </from_pr_metadata>
-          <store>
-            Remember this branch name - you will need it for all git operations
-          </store>
         </step>
       </steps>
     </phase>
@@ -103,21 +61,40 @@
     <phase number="2" name="pr_analysis">
       <title>Analyze PR and Understand Security Fix</title>
       <description>
-        Deep dive into the PR to understand what vulnerability is being fixed
-        and what changes were made
+        Fetch PR details using GitHub MCP and understand what vulnerability is being fixed
       </description>
       <steps>
         <step number="1">
           <action>Fetch PR details via GitHub MCP</action>
-          <tool>pull_request_read with method="get"</tool>
-          <details>
-            Retrieve:
-            - PR description and comments
-            - Changed files list (use method="get_files")
-            - Diff of changes (use method="get_diff")
-            - CI/CD test results (use method="get_check_runs")
-            - Branch information (response.head.ref)
-          </details>
+          <tool>use_mcp_tool with github server</tool>
+          <mcp_tool>pull_request_read</mcp_tool>
+          <parameters>
+            <method>get</method>
+            <owner>Extracted from PR URL</owner>
+            <repo>Extracted from PR URL</repo>
+            <pullNumber>Extracted from PR URL</pullNumber>
+          </parameters>
+          <example>
+            <use_mcp_tool>
+              <server_name>github</server_name>
+              <tool_name>pull_request_read</tool_name>
+              <arguments>
+                {
+                  "method": "get",
+                  "owner": "highorbit25",
+                  "repo": "concert-bob-remediate",
+                  "pullNumber": 38
+                }
+              </arguments>
+            </use_mcp_tool>
+          </example>
+          <retrieve>
+            - PR title and description
+            - Changed files list
+            - Diff of changes
+            - CI/CD test results
+            - Any linked issues or CVE references
+          </retrieve>
         </step>
         
         <step number="2">
@@ -170,18 +147,6 @@
       </description>
       <steps>
         <step number="1">
-          <action>Checkout the PR branch locally</action>
-          <command_example>
-            git fetch origin pull/{PR_NUMBER}/head:pr-{PR_NUMBER}
-            git checkout pr-{PR_NUMBER}
-          </command_example>
-          <details>
-            Use execute_command tool to run git commands if needed,
-            or guide user to checkout the branch
-          </details>
-        </step>
-        
-        <step number="2">
           <action>Install dependencies with upgraded versions</action>
           <language_specific>
             <python>
@@ -200,7 +165,7 @@
           </language_specific>
         </step>
         
-        <step number="3">
+        <step number="2">
           <action>Run the unit test suite</action>
           <language_specific>
             <python>
@@ -226,7 +191,7 @@
           </details>
         </step>
         
-        <step number="4">
+        <step number="3">
           <action>Analyze test failures</action>
           <analysis_checklist>
             <item>How many tests are failing?</item>
@@ -295,19 +260,6 @@
             - Verify security fix is not compromised
           </solution_approach>
         </pattern>
-        
-        <pattern name="dependency_conflicts">
-          <description>Upgraded package has conflicting dependencies</description>
-          <example>
-            ERROR: package-a requires package-b<2.0, but you have package-b 2.1
-          </example>
-          <solution_approach>
-            - Analyze dependency tree
-            - Find compatible versions
-            - May need to upgrade other packages
-            - Check for transitive dependency issues
-          </solution_approach>
-        </pattern>
       </common_failure_patterns>
       
       <investigation_steps>
@@ -332,14 +284,6 @@
           <tool>search_files</tool>
           <details>
             Find all places in the codebase that import or use the package
-          </details>
-        </step>
-        
-        <step number="4">
-          <action>Compare with package documentation</action>
-          <details>
-            Reference the package's documentation, changelog, or migration guide
-            to understand what changed between versions
           </details>
         </step>
       </investigation_steps>
@@ -410,28 +354,6 @@
           </details>
         </step>
       </steps>
-      
-      <common_fixes>
-        <fix type="import_update">
-          <before>from package import old_function</before>
-          <after>from package.new_module import old_function</after>
-        </fix>
-        
-        <fix type="api_signature">
-          <before>result = function(arg1, arg2)</before>
-          <after>result = function(arg1, arg2, new_required_arg=default_value)</after>
-        </fix>
-        
-        <fix type="deprecated_api">
-          <before>data = obj.old_method()</before>
-          <after>data = obj.new_method()  # Replaced deprecated old_method</after>
-        </fix>
-        
-        <fix type="configuration">
-          <before>config = {'option': 'value'}</before>
-          <after>config = {'option': 'value', 'new_option': 'required_value'}</after>
-        </fix>
-      </common_fixes>
     </phase>
 
     <phase number="6" name="validation">
@@ -469,40 +391,23 @@
             <item>Note any potential impacts or considerations</item>
           </documentation_requirements>
         </step>
-        
-        <step number="4">
-          <action>Prepare summary for PR update</action>
-          <summary_template>
-            ## Unit Test Fixes for CVE-{CVE_ID}
-            
-            ### Changes Made
-            - Fixed import statements in {files}
-            - Updated API calls to match new {package} v{version} signature
-            - Replaced deprecated methods with recommended alternatives
-            
-            ### Root Cause
-            The {package} upgrade from v{old} to v{new} introduced breaking changes:
-            - {breaking_change_1}
-            - {breaking_change_2}
-            
-            ### Testing
-            - All {N} unit tests now pass
-            - No regressions introduced
-            - Security fix verified and maintained
-            
-            ### Files Modified
-            - {file1}: {reason}
-            - {file2}: {reason}
-          </summary_template>
-        </step>
       </steps>
     </phase>
 
     <phase number="7" name="pr_update">
       <title>Update PR with Fixes</title>
       <description>
-        Commit changes and update the PR with your fixes
+        Commit changes to the PR branch and document the fixes
       </description>
+      <critical_requirement>
+        <rule>ALWAYS commit to the branch name provided in step 6 of the workflow prompt</rule>
+        <why>
+          - The workflow explicitly provides the correct branch name
+          - This ensures the PR is updated (not a new PR created)
+          - This triggers the CI/CD workflow to re-run tests
+        </why>
+      </critical_requirement>
+      
       <steps>
         <step number="1">
           <action>Review all changes one final time</action>
@@ -524,24 +429,73 @@
             Addresses failing tests in PR #{pr_number}
             Related to CVE-{cve_id}
           </commit_message_format>
+          <commands>
+            <command>git checkout {pr_branch_from_workflow_prompt}</command>
+            <command>git add {modified_files}</command>
+            <command>git commit -m "{message}"</command>
+          </commands>
         </step>
         
         <step number="3">
           <action>Push changes to PR branch</action>
-          <details>
-            Guide user to push changes or use GitHub MCP if available
-          </details>
+          <command>git push origin {pr_branch_from_workflow_prompt}</command>
+          <critical>
+            Use the exact branch name from step 6 of the workflow prompt.
+            This updates the existing PR and triggers the CI/CD workflow.
+          </critical>
         </step>
         
         <step number="4">
-          <action>Add comment to PR</action>
-          <details>
-            Post a comment on the PR explaining:
-            - What was fixed
-            - Why tests were failing
-            - That all tests now pass
-            - Any considerations for reviewers
-          </details>
+          <action>Add comment to PR documenting fixes</action>
+          <tool>use_mcp_tool with github server</tool>
+          <mcp_tool>pull_request_review_write</mcp_tool>
+          <parameters>
+            <method>create</method>
+            <owner>From parsed PR URL</owner>
+            <repo>From parsed PR URL</repo>
+            <pullNumber>From parsed PR URL</pullNumber>
+            <event>COMMENT</event>
+            <body>Formatted markdown comment</body>
+          </parameters>
+          <example>
+            <use_mcp_tool>
+              <server_name>github</server_name>
+              <tool_name>pull_request_review_write</tool_name>
+              <arguments>
+                {
+                  "method": "create",
+                  "owner": "highorbit25",
+                  "repo": "concert-bob-remediate",
+                  "pullNumber": 38,
+                  "event": "COMMENT",
+                  "body": "## Unit Test Fixes\n\nI've fixed the failing unit tests..."
+                }
+              </arguments>
+            </use_mcp_tool>
+          </example>
+          <comment_template>
+            ## Unit Test Fixes
+            
+            I've fixed the failing unit tests caused by the {package} upgrade.
+            
+            ### Changes Made
+            - {change_1}
+            - {change_2}
+            
+            ### Root Cause
+            The upgrade from v{old} to v{new} introduced these breaking changes:
+            - {breaking_change_1}
+            - {breaking_change_2}
+            
+            ### Testing
+            - All {N} unit tests now pass ✅
+            - No regressions introduced
+            - Security fix verified and maintained
+            
+            ### Files Modified
+            - `{file1}`: {reason}
+            - `{file2}`: {reason}
+          </comment_template>
         </step>
       </steps>
     </phase>
@@ -580,17 +534,7 @@
         - Suggest interim solutions if possible
       </action>
     </scenario>
-    
-    <scenario name="dependency_conflict_unresolvable">
-      <description>
-        Package upgrade creates dependency conflicts that can't be resolved
-      </description>
-      <action>
-        - Document the dependency conflict
-        - Analyze the dependency tree
-        - Suggest alternative package versions if available
-        - Recommend consulting with DevOps team
-      </action>
-    </scenario>
   </escalation_scenarios>
 </vulnerability_remediation_workflow>
+
+<!-- Made with Bob -->
