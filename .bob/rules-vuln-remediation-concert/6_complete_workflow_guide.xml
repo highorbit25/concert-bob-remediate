@@ -44,17 +44,16 @@
         <substep number="1.2">
           <action>Fetch PR details using GitHub MCP</action>
           <tool>use_mcp_tool</tool>
-          <mcp_tool>pull_request_read</mcp_tool>
+          <mcp_tool>get_pull_request</mcp_tool>
           <example>
             <use_mcp_tool>
               <server_name>github</server_name>
-              <tool_name>pull_request_read</tool_name>
+              <tool_name>get_pull_request</tool_name>
               <arguments>
                 {
-                  "method": "get",
                   "owner": "highorbit25",
                   "repo": "concert-bob-remediate",
-                  "pullNumber": 38
+                  "pull_number": 38
                 }
               </arguments>
             </use_mcp_tool>
@@ -368,25 +367,23 @@
         <substep number="8.2">
           <action>Add comment using GitHub MCP</action>
           <tool>use_mcp_tool</tool>
-          <mcp_tool>pull_request_review_write</mcp_tool>
+          <mcp_tool>create_pull_request_review</mcp_tool>
           <parameters>
-            <method>create</method>
             <owner>From parsed PR URL</owner>
             <repo>From parsed PR URL</repo>
-            <pullNumber>From parsed PR URL</pullNumber>
+            <pull_number>From parsed PR URL</pull_number>
             <event>COMMENT</event>
             <body>Formatted markdown comment</body>
           </parameters>
           <example>
             <use_mcp_tool>
               <server_name>github</server_name>
-              <tool_name>pull_request_review_write</tool_name>
+              <tool_name>create_pull_request_review</tool_name>
               <arguments>
                 {
-                  "method": "create",
                   "owner": "highorbit25",
                   "repo": "concert-bob-remediate",
-                  "pullNumber": 38,
+                  "pull_number": 38,
                   "event": "COMMENT",
                   "body": "## Unit Test Fixes\n\nI've fixed the failing unit tests caused by the Flask upgrade.\n\n### Changes Made\n- Updated import path from `flask.json` to `flask`\n- Modified test assertions to use `request.get_json()`\n\n### Root Cause\nThe upgrade from Flask v2.0.1 to v3.1.0 introduced these breaking changes:\n- `flask.json` module was removed\n- `request.json` property deprecated\n\n### Testing\n- All 3 unit tests now pass ✅\n- No regressions introduced\n- Security fix verified\n\n### Files Modified\n- `app/vulnerable/main.py`: Updated Flask imports\n- `app/vulnerable/test_main.py`: Updated test assertions\n\nReady for review!"
                 }

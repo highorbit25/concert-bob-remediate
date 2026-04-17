@@ -7,24 +7,22 @@
   <github_mcp_tools>
     <title>GitHub MCP Tools for Bob Shell</title>
     
-    <tool name="pull_request_read">
+    <tool name="get_pull_request">
       <description>Fetch pull request details</description>
       <parameters>
-        <parameter name="method" required="true">Always use "get"</parameter>
         <parameter name="owner" required="true">Repository owner from parsed PR URL</parameter>
         <parameter name="repo" required="true">Repository name from parsed PR URL</parameter>
-        <parameter name="pullNumber" required="true">PR number from parsed PR URL</parameter>
+        <parameter name="pull_number" required="true">PR number from parsed PR URL</parameter>
       </parameters>
       <usage_example>
         <use_mcp_tool>
           <server_name>github</server_name>
-          <tool_name>pull_request_read</tool_name>
+          <tool_name>get_pull_request</tool_name>
           <arguments>
             {
-              "method": "get",
               "owner": "highorbit25",
               "repo": "concert-bob-remediate",
-              "pullNumber": 38
+              "pull_number": 38
             }
           </arguments>
         </use_mcp_tool>
@@ -39,26 +37,24 @@
       </returns>
     </tool>
     
-    <tool name="pull_request_review_write">
+    <tool name="create_pull_request_review">
       <description>Add a comment to the pull request</description>
       <parameters>
-        <parameter name="method" required="true">Always use "create"</parameter>
         <parameter name="owner" required="true">Repository owner from parsed PR URL</parameter>
         <parameter name="repo" required="true">Repository name from parsed PR URL</parameter>
-        <parameter name="pullNumber" required="true">PR number from parsed PR URL</parameter>
+        <parameter name="pull_number" required="true">PR number from parsed PR URL</parameter>
         <parameter name="event" required="true">Always use "COMMENT"</parameter>
         <parameter name="body" required="true">Markdown-formatted comment text</parameter>
       </parameters>
       <usage_example>
         <use_mcp_tool>
           <server_name>github</server_name>
-          <tool_name>pull_request_review_write</tool_name>
+          <tool_name>create_pull_request_review</tool_name>
           <arguments>
             {
-              "method": "create",
               "owner": "highorbit25",
               "repo": "concert-bob-remediate",
-              "pullNumber": 38,
+              "pull_number": 38,
               "event": "COMMENT",
               "body": "## Unit Test Fixes\n\nI've fixed the failing unit tests caused by the Flask upgrade.\n\n### Changes Made\n- Updated import paths\n- Fixed API calls\n\n### Testing\n- All tests now pass ✅"
             }
@@ -278,18 +274,17 @@
     <pr_comment>
       <when>After pushing fixes to the PR branch</when>
       <purpose>Document what was fixed for PR reviewers</purpose>
-      <how>Use GitHub MCP pull_request_review_write tool</how>
+      <how>Use GitHub MCP create_pull_request_review tool</how>
       
       <implementation>
         <use_mcp_tool>
           <server_name>github</server_name>
-          <tool_name>pull_request_review_write</tool_name>
+          <tool_name>create_pull_request_review</tool_name>
           <arguments>
             {
-              "method": "create",
               "owner": "{owner_from_parsed_url}",
               "repo": "{repo_from_parsed_url}",
-              "pullNumber": {pr_number_from_parsed_url},
+              "pull_number": {pr_number_from_parsed_url},
               "event": "COMMENT",
               "body": "{formatted_comment}"
             }

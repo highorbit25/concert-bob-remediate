@@ -67,23 +67,21 @@
         <step number="1">
           <action>Fetch PR details via GitHub MCP</action>
           <tool>use_mcp_tool with github server</tool>
-          <mcp_tool>pull_request_read</mcp_tool>
+          <mcp_tool>get_pull_request</mcp_tool>
           <parameters>
-            <method>get</method>
             <owner>Extracted from PR URL</owner>
             <repo>Extracted from PR URL</repo>
-            <pullNumber>Extracted from PR URL</pullNumber>
+            <pull_number>Extracted from PR URL</pull_number>
           </parameters>
           <example>
             <use_mcp_tool>
               <server_name>github</server_name>
-              <tool_name>pull_request_read</tool_name>
+              <tool_name>get_pull_request</tool_name>
               <arguments>
                 {
-                  "method": "get",
                   "owner": "highorbit25",
                   "repo": "concert-bob-remediate",
-                  "pullNumber": 38
+                  "pull_number": 38
                 }
               </arguments>
             </use_mcp_tool>
@@ -448,25 +446,23 @@
         <step number="4">
           <action>Add comment to PR documenting fixes</action>
           <tool>use_mcp_tool with github server</tool>
-          <mcp_tool>pull_request_review_write</mcp_tool>
+          <mcp_tool>create_pull_request_review</mcp_tool>
           <parameters>
-            <method>create</method>
             <owner>From parsed PR URL</owner>
             <repo>From parsed PR URL</repo>
-            <pullNumber>From parsed PR URL</pullNumber>
+            <pull_number>From parsed PR URL</pull_number>
             <event>COMMENT</event>
             <body>Formatted markdown comment</body>
           </parameters>
           <example>
             <use_mcp_tool>
               <server_name>github</server_name>
-              <tool_name>pull_request_review_write</tool_name>
+              <tool_name>create_pull_request_review</tool_name>
               <arguments>
                 {
-                  "method": "create",
                   "owner": "highorbit25",
                   "repo": "concert-bob-remediate",
-                  "pullNumber": 38,
+                  "pull_number": 38,
                   "event": "COMMENT",
                   "body": "## Unit Test Fixes\n\nI've fixed the failing unit tests..."
                 }
