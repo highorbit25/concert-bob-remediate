@@ -482,7 +482,7 @@ jobs:
           bobshell_api_key: ${{ secrets.BOBSHELL_API_KEY }}
           bobshell_debug: true
           mcp: ${{ secrets.BOBSHELL_MCP_CONFIG }}
-          chat_mode: vuln-remediation-concert
+          chat_mode: advanced
           prompt: |
             Fix the failing unit tests in PR #${{ needs.run-unit-tests-after-approval.outputs.pr_number }}.
             
