@@ -153,6 +153,8 @@ jobs:
             - You MUST follow the PR template format from 6_pr_formatting_and_documentation.xml exactly
             - Only update package manifest files. Do NOT modify application code or tests
             - If sources disagree, document the discrepancy and choose the safest version
+
+            10. Link the PR to GitHub issue #${{ steps.get-issue.outputs.issue_number }}
           settings: ${{ vars.BOBSHELL_SETTINGS }}
       
       - name: Validate PR Creation
