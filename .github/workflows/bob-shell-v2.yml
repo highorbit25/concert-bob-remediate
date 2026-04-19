@@ -509,61 +509,61 @@ jobs:
               });
             }
 
-  # # ============================================================================
-  # # DEBUG JOB: Custom Prompt for Debugging
-  # # ============================================================================
-  # debug-custom-prompt:
-  #   name: "Debug: Custom Prompt"
-  #   runs-on: ubuntu-latest
-  #   if: |
-  #     github.event_name == 'workflow_dispatch' &&
-  #     github.event.inputs.custom_prompt != ''
+  # ============================================================================
+  # DEBUG JOB: Custom Prompt for Debugging
+  # ============================================================================
+  debug-custom-prompt:
+    name: "Debug: Custom Prompt"
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.custom_prompt != ''
     
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v4
-  #       with:
-  #         fetch-depth: 0
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       
-  #     - name: Setup Node.js
-  #       uses: actions/setup-node@v4
-  #       with:
-  #         node-version: '22'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       
-  #     - name: Configure Git
-  #       run: |
-  #         git config --global user.name "github-actions[bot]"
-  #         git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
       
-  #     - name: Create Concert API Credentials File
-  #       run: |
-  #         cat > .env << EOF
-  #         CONCERT_API_KEY="${{ secrets.CONCERT_API_KEY }}"
-  #         CONCERT_HOSTNAME="${{ secrets.CONCERT_HOSTNAME }}"
-  #         CONCERT_INSTANCE_ID="${{ secrets.CONCERT_INSTANCE_ID }}"
-  #         EOF
-  #         echo "✅ Concert API credentials configured"
+      - name: Create Concert API Credentials File
+        run: |
+          cat > .env << EOF
+          CONCERT_API_KEY="${{ secrets.CONCERT_API_KEY }}"
+          CONCERT_HOSTNAME="${{ secrets.CONCERT_HOSTNAME }}"
+          CONCERT_INSTANCE_ID="${{ secrets.CONCERT_INSTANCE_ID }}"
+          EOF
+          echo "✅ Concert API credentials configured"
       
-  #     - name: Run Bob Shell with Custom Prompt
-  #       id: bob-debug
-  #       uses: ./.github/actions/bob-shell
-  #       with:
-  #         bobshell_api_key: ${{ secrets.BOBSHELL_API_KEY }}
-  #         bobshell_debug: true
-  #         mcp: ${{ secrets.BOBSHELL_MCP_CONFIG }}
-  #         prompt: ${{ github.event.inputs.custom_prompt }}
-  #         settings: ${{ vars.BOBSHELL_SETTINGS }}
+      - name: Run Bob Shell with Custom Prompt
+        id: bob-debug
+        uses: ./.github/actions/bob-shell
+        with:
+          bobshell_api_key: ${{ secrets.BOBSHELL_API_KEY }}
+          bobshell_debug: true
+          mcp: ${{ secrets.BOBSHELL_MCP_CONFIG }}
+          prompt: ${{ github.event.inputs.custom_prompt }}
+          settings: ${{ vars.BOBSHELL_SETTINGS }}
       
-  #     - name: Display Results
-  #       run: |
-  #         echo "## Bob Shell Debug Results" >> $GITHUB_STEP_SUMMARY
-  #         echo "" >> $GITHUB_STEP_SUMMARY
-  #         echo "### Custom Prompt Used:" >> $GITHUB_STEP_SUMMARY
-  #         echo '```' >> $GITHUB_STEP_SUMMARY
-  #         echo "${{ github.event.inputs.custom_prompt }}" >> $GITHUB_STEP_SUMMARY
-  #         echo '```' >> $GITHUB_STEP_SUMMARY
-  #         echo "" >> $GITHUB_STEP_SUMMARY
-  #         echo "### Bob Shell Response:" >> $GITHUB_STEP_SUMMARY
-  #         echo '```' >> $GITHUB_STEP_SUMMARY
-  #         echo "${{ steps.bob-debug.outputs.summary }}" >> $GITHUB_STEP_SUMMARY
-  #         echo '```' >> $GITHUB_STEP_SUMMARY
+      - name: Display Results
+        run: |
+          echo "## Bob Shell Debug Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Custom Prompt Used:" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ github.event.inputs.custom_prompt }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Bob Shell Response:" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.bob-debug.outputs.summary }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
