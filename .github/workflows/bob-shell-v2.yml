@@ -34,69 +34,10 @@ permissions:
 
 jobs:
   # ============================================================================
-  # DEBUG JOB: Custom Prompt for Debugging
-  # ============================================================================
-  debug-custom-prompt:
-    name: "Debug: Custom Prompt"
-    runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' &&
-      github.event.inputs.custom_prompt != ''
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      
-      - name: Configure Git
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-      
-      - name: Create Concert API Credentials File
-        run: |
-          cat > .env << EOF
-          CONCERT_API_KEY="${{ secrets.CONCERT_API_KEY }}"
-          CONCERT_HOSTNAME="${{ secrets.CONCERT_HOSTNAME }}"
-          CONCERT_INSTANCE_ID="${{ secrets.CONCERT_INSTANCE_ID }}"
-          EOF
-          echo "✅ Concert API credentials configured"
-      
-      - name: Run Bob Shell with Custom Prompt
-        id: bob-debug
-        uses: ./.github/actions/bob-shell
-        with:
-          bobshell_api_key: ${{ secrets.BOBSHELL_API_KEY }}
-          bobshell_debug: true
-          mcp: ${{ secrets.BOBSHELL_MCP_CONFIG }}
-          prompt: ${{ github.event.inputs.custom_prompt }}
-          settings: ${{ vars.BOBSHELL_SETTINGS }}
-      
-      - name: Display Results
-        run: |
-          echo "## Bob Shell Debug Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Custom Prompt Used:" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "${{ github.event.inputs.custom_prompt }}" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Bob Shell Response:" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.bob-debug.outputs.summary }}" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-
-  # ============================================================================
   # STEP 1: DevOps Concert Mode - Research CVE and Create PR
   # ============================================================================
   devops-cve-research:
-    name: "Step 1: DevOps - Research CVE & Create PR"
+    name: "1: DevOps - Research CVE & Create PR"
     runs-on: ubuntu-latest
     if: |
       github.event.inputs.custom_prompt == '' &&
@@ -206,7 +147,6 @@ jobs:
                  * 📊 Impact Assessment (Security Impact, Functional Impact, Compatibility)
                  * ✅ Validation (Checklist including all API queries, pip install verification, transitive dependency checks)
                  * 📚 References (NVD URL, GitHub Advisory URL, Package Changelog, CWE URL, Concert Issue)
-               - Document cross-reference validation results
             
             CRITICAL REQUIREMENTS:
             - You MUST query NVD API or GitHub Advisory API for every CVE - this is non-negotiable
@@ -285,7 +225,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: prNumber,
-              reviewers: ['baobin-devops']  // DevOps Engineer
+              reviewers: ${{ vars.DEVOPS_REVIEWERS }}  // DevOps Team
             });
       
       - name: Add workflow metadata label
@@ -305,7 +245,7 @@ jobs:
   # STEP 2: DevOps Environment Approval Gate
   # ============================================================================
   devops-approval-gate:
-    name: "Step 2: DevOps Approval Gate"
+    name: "2: Pause for DevOps Approval"
     runs-on: ubuntu-latest
     needs: devops-cve-research
     if: |
@@ -342,16 +282,14 @@ jobs:
               issue_number: prNumber,
               body: `## ✅ DevOps Environment Approval Received!
               
-              The protected \`devops-approval\` environment was approved.
-              
-              🧪 Continuing the same workflow run with unit tests now...`
+              🧪 Running the unit tests now...`
             });
 
   # ============================================================================
   # STEP 3: Run Unit Tests After DevOps Approval
   # ============================================================================
   run-unit-tests-after-approval:
-    name: "Step 3: Run Unit Tests (After Approval)"
+    name: "3: Run Unit Tests"
     runs-on: ubuntu-latest
     needs: devops-approval-gate
     if: |
@@ -419,18 +357,14 @@ jobs:
                 
                 All unit tests passed successfully after the package upgrade.
                 
-                **Next Steps:**
-                - Requesting Software Lead review for final approval
-                - Once approved, this PR can be merged
-                
-                @amrupapz Please review and approve for merge.`
+                Ready for Software Lead review and approval for merge.`
               });
               
               await github.rest.pulls.requestReviewers({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 pull_number: prNumber,
-                reviewers: ['amrupapz']
+                reviewers: ${{ vars.LEAD_REVIEWERS }}
               });
             } else {
               await github.rest.issues.createComment({
@@ -449,7 +383,7 @@ jobs:
   # STEP 4: Fix Failing Tests (if needed)
   # ============================================================================
   fix-failing-tests:
-    name: "Step 4: Fix Failing Unit Tests"
+    name: "4: Fix Failing Unit Tests"
     runs-on: ubuntu-latest
     needs: run-unit-tests-after-approval
     if: |
@@ -536,25 +470,21 @@ jobs:
                 
                 Bob has successfully fixed the failing unit tests. All tests now pass.
                 
-                **Next Steps:**
-                - Requesting Software Lead review for final approval
-                - Once approved, this PR can be merged
-                
-                @amrupapz Please review the code fixes and approve for merge.`
+                Ready for Software Lead review and approval for merge.`
               });
               
               await github.rest.pulls.requestReviewers({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 pull_number: prNumber,
-                reviewers: ['amrupapz']
+                reviewers: ${{ vars.LEAD_REVIEWERS }}
               });
             } else {
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: prNumber,
-                labels: ['needs-manual-intervention']
+                labels: ['needs-manual-fix']
               });
               
               await github.rest.issues.createComment({
@@ -566,14 +496,72 @@ jobs:
                 Bob attempted to fix the failing tests, but some tests may still be failing.
                 Manual intervention may be required.
                 
-                @highorbit25 Please review the changes and continue the remediation.`
+                Please review the changes and continue the remediation.`
               });
               
               await github.rest.issues.addAssignees({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: prNumber,
-                assignees: ['highorbit25']
+                assignees: ${{ vars.SWE_REVIEWERS }}
               });
             }
 
+  # # ============================================================================
+  # # DEBUG JOB: Custom Prompt for Debugging
+  # # ============================================================================
+  # debug-custom-prompt:
+  #   name: "Debug: Custom Prompt"
+  #   runs-on: ubuntu-latest
+  #   if: |
+  #     github.event_name == 'workflow_dispatch' &&
+  #     github.event.inputs.custom_prompt != ''
+    
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0
+      
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: '22'
+      
+  #     - name: Configure Git
+  #       run: |
+  #         git config --global user.name "github-actions[bot]"
+  #         git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      
+  #     - name: Create Concert API Credentials File
+  #       run: |
+  #         cat > .env << EOF
+  #         CONCERT_API_KEY="${{ secrets.CONCERT_API_KEY }}"
+  #         CONCERT_HOSTNAME="${{ secrets.CONCERT_HOSTNAME }}"
+  #         CONCERT_INSTANCE_ID="${{ secrets.CONCERT_INSTANCE_ID }}"
+  #         EOF
+  #         echo "✅ Concert API credentials configured"
+      
+  #     - name: Run Bob Shell with Custom Prompt
+  #       id: bob-debug
+  #       uses: ./.github/actions/bob-shell
+  #       with:
+  #         bobshell_api_key: ${{ secrets.BOBSHELL_API_KEY }}
+  #         bobshell_debug: true
+  #         mcp: ${{ secrets.BOBSHELL_MCP_CONFIG }}
+  #         prompt: ${{ github.event.inputs.custom_prompt }}
+  #         settings: ${{ vars.BOBSHELL_SETTINGS }}
+      
+  #     - name: Display Results
+  #       run: |
+  #         echo "## Bob Shell Debug Results" >> $GITHUB_STEP_SUMMARY
+  #         echo "" >> $GITHUB_STEP_SUMMARY
+  #         echo "### Custom Prompt Used:" >> $GITHUB_STEP_SUMMARY
+  #         echo '```' >> $GITHUB_STEP_SUMMARY
+  #         echo "${{ github.event.inputs.custom_prompt }}" >> $GITHUB_STEP_SUMMARY
+  #         echo '```' >> $GITHUB_STEP_SUMMARY
+  #         echo "" >> $GITHUB_STEP_SUMMARY
+  #         echo "### Bob Shell Response:" >> $GITHUB_STEP_SUMMARY
+  #         echo '```' >> $GITHUB_STEP_SUMMARY
+  #         echo "${{ steps.bob-debug.outputs.summary }}" >> $GITHUB_STEP_SUMMARY
+  #         echo '```' >> $GITHUB_STEP_SUMMARY
