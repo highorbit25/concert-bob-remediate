@@ -154,7 +154,7 @@ jobs:
             - Only update package manifest files. Do NOT modify application code or tests
             - If sources disagree, document the discrepancy and choose the safest version
 
-            10. Link the PR to GitHub issue #${{ steps.get-issue.outputs.issue_number }}
+            10. Link the PR to GitHub issue #${{ steps.get-issue.outputs.issue_number }} without commenting on issue
           settings: ${{ vars.BOBSHELL_SETTINGS }}
       
       - name: Validate PR Creation
@@ -205,13 +205,12 @@ jobs:
               **Next Steps:**
               1. DevOps Engineer: Review the package changes in this PR
               2. Approve the protected \`devops-approval\` environment in the workflow run
-              3. If you need to reject, deny the environment approval or close this PR with a comment
               
               **To approve the workflow:** Open the current workflow run and use the **Review deployments** approval for the \`devops-approval\` environment
               
               ⏸️ Workflow paused - waiting for environment approval
               
-              Once approved, the same workflow run will automatically:
+              Once approved, workflow run will proceed to:
               - Run unit tests
               - Fix any failing tests if needed
               - Request Software Lead review`
