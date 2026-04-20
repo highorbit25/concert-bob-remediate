@@ -1,6 +1,9 @@
 # Concert + Bob Vulnerability Remediation
 This repo contains a sample vulnerable python application
+
 We will showcase a workflow for vulnerability remediation using Concert + Bob
+
+![Workflow Diagram](./workflow_diagram.png)
 
 ### Initial Setup:
 #### Configure the following Github Action Secrets
