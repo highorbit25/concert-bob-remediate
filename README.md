@@ -12,7 +12,7 @@ We will showcase a workflow for vulnerability remediation using Concert + Bob
 ```
 BOBSHELL_API_KEY="XXX"
 
-BOBSHELL_MCP_CONFIG="{mcp.json}"
+BOBSHELL_MCP_CONFIG="{sample in .bob/mcp.json}"
 
 CONCERT_API_KEY="C_API_KEY XXX"
 ```
