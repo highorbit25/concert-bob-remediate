@@ -15,10 +15,6 @@ BOBSHELL_API_KEY="XXX"
 BOBSHELL_MCP_CONFIG="{mcp.json}"
 
 CONCERT_API_KEY="C_API_KEY XXX"
-
-CONCERT_HOSTNAME="https://162.133.134.XXX:12443"
-
-CONCERT_INSTANCE_ID="0000-0000-0000-0000"
 ```
 
 
@@ -26,6 +22,10 @@ CONCERT_INSTANCE_ID="0000-0000-0000-0000"
 `https://github.com/highorbit25/concert-bob-remediate/settings/variables/actions`
 
 ```
+CONCERT_HOSTNAME="https://162.133.134.XXX:12443"
+
+CONCERT_INSTANCE_ID="0000-0000-0000-0000"
+
 # To disable telemetry
 BOBSHELL_SETTINGS={ "security": { "ibmTelemetry": { "enabled": false } } }
 
