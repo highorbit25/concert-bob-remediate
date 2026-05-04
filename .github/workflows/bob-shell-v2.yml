@@ -135,15 +135,17 @@ jobs:
             
             4. IF ALL CVEs ARE FALSE POSITIVES:
                a. Create detailed comment on GitHub issue with analysis for EACH CVE
-               b. CRITICAL: Comment MUST include a clear "False Positive CVEs" section listing ALL CVE IDs
-               c. Format: List each CVE clearly (e.g., "CVE-2023-32681", "CVE-2024-35195")
-               d. Include evidence for EACH CVE: file paths, code snippets, reasoning
-               e. Tag DevOps engineer for review
-               f. Request they approve the 'devops-approval' environment if they agree
-               g. Explain that approval triggers Concert API batch update for ALL CVEs
-               h. Do NOT create branch or PR
-               i. Do NOT output pr_number, pr_branch, or pr_url
-               j. Exit workflow - Bob has commented on the issue
+               b. CRITICAL: Comment MUST include:
+                  - Package name and version at the top (e.g., "Package: requests 2.25.1")
+                  - A clear "False Positive CVEs" section listing ALL CVE IDs
+                  - Format: List each CVE clearly (e.g., "CVE-2023-32681", "CVE-2024-35195")
+               c. Include evidence for EACH CVE: file paths, code snippets, reasoning
+               d. Tag DevOps engineers for review using: ${{ vars.DEVOPS_REVIEWERS }}
+               e. Request they approve the 'devops-approval' environment if they agree
+               f. Explain that approval triggers Concert API batch update for ALL CVEs
+               g. Do NOT create branch or PR
+               h. Do NOT output pr_number, pr_branch, or pr_url
+               i. Exit workflow - Bob has commented on the issue
             
             4b. IF ANY CVE IS A TRUE POSITIVE:
                a. Proceed with package upgrade (fixes all CVEs)
@@ -381,14 +383,51 @@ jobs:
               return;
             }
             
-            // Extract package name from issue body
+            // Extract package name from issue body (try multiple patterns)
             const issueBody = issue.body || '';
-            const packageMatch = issueBody.match(/\*\*Package\*\*:\s*`?([a-zA-Z0-9_-]+)`?/i);
-            const packageName = packageMatch ? packageMatch[1] : 'unknown';
+            let packageName = 'unknown';
             
-            // Extract application name from issue body
-            const appMatch = issueBody.match(/\*\*Application\*\*:\s*([a-zA-Z0-9_-]+)/i);
-            const applicationName = appMatch ? appMatch[1] : 'vulnerable-flask-app';
+            // Try different patterns for package name
+            const packagePatterns = [
+              /\*\*Package\*\*:\s*`?([a-zA-Z0-9_.-]+)`?\s+(\d+\.\d+\.\d+)/i,  // **Package**: `requests` 2.25.1
+              /\*\*Package\*\*:\s*`?([a-zA-Z0-9_.-]+)`?/i,                      // **Package**: `requests`
+              /Package:\s*`?([a-zA-Z0-9_.-]+)`?\s+(\d+\.\d+\.\d+)/i,           // Package: requests 2.25.1
+              /Package:\s*`?([a-zA-Z0-9_.-]+)`?/i,                              // Package: requests
+              /package\s+([a-zA-Z0-9_.-]+)\s+(\d+\.\d+\.\d+)/i,                 // package requests 2.25.1
+              /`([a-zA-Z0-9_.-]+)`\s+(\d+\.\d+\.\d+)/                           // `requests` 2.25.1
+            ];
+            
+            for (const pattern of packagePatterns) {
+              const match = issueBody.match(pattern);
+              if (match && match[1]) {
+                packageName = match[1];
+                break;
+              }
+            }
+            
+            // Also try to extract from Bob's comment if not found in issue
+            if (packageName === 'unknown') {
+              const commentPackageMatch = commentBody.match(/package\s+`?([a-zA-Z0-9_.-]+)`?/i);
+              if (commentPackageMatch) {
+                packageName = commentPackageMatch[1];
+              }
+            }
+            
+            // Extract application name from issue body (try multiple patterns)
+            let applicationName = 'vulnerable-flask-app';
+            const appPatterns = [
+              /\*\*Application\*\*:\s*`?([a-zA-Z0-9_-]+)`?/i,                   // **Application**: app-name
+              /Application:\s*`?([a-zA-Z0-9_-]+)`?/i,                           // Application: app-name
+              /application\s+([a-zA-Z0-9_-]+)/i                                 // application app-name
+            ];
+            
+            for (const pattern of appPatterns) {
+              const match = issueBody.match(pattern);
+              if (match && match[1]) {
+                applicationName = match[1];
+                break;
+              }
+            }
             
             core.info(`Extracted ${cveIds.length} CVE(s): ${cveIds.join(', ')}`);
             core.info(`Extracted Package: ${packageName}`);
