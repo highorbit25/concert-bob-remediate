@@ -400,6 +400,8 @@ jobs:
                  }
             
             5. Execute the PATCH request to update ALL CVEs in a single batch
+               IMPORTANT: Do NOT echo or log the curl command itself in your output
+               Only log the results (success/failure) without showing the actual command
             
             6. Post a success comment on the GitHub issue with:
                - List of all CVEs updated
