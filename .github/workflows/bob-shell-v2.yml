@@ -449,17 +449,38 @@ jobs:
           CONCERT_API_KEY="${{ secrets.CONCERT_API_KEY }}"
           CONCERT_HOSTNAME="${{ vars.CONCERT_HOSTNAME }}"
           CONCERT_INSTANCE_ID="${{ vars.CONCERT_INSTANCE_ID }}"
+          APP_NAME="${{ steps.extract-info.outputs.application_name }}"
+          
+          echo "Looking for application: ${APP_NAME}"
           
           RESPONSE=$(curl -ksSL -X GET \
             -H "Authorization: ${CONCERT_API_KEY}" \
             -H "InstanceId: ${CONCERT_INSTANCE_ID}" \
             "${CONCERT_HOSTNAME}/concert/core/api/v1/applications")
           
-          APP_NAME="${{ steps.extract-info.outputs.application_name }}"
-          APP_ID=$(echo "${RESPONSE}" | jq -r ".[] | select(.name == \"${APP_NAME}\") | .id" | head -1)
+          echo "Concert API Response:"
+          echo "${RESPONSE}" | jq '.' || echo "${RESPONSE}"
+          
+          # Check if response is an array or object
+          if echo "${RESPONSE}" | jq -e 'type == "array"' > /dev/null 2>&1; then
+            echo "Response is an array, searching for application..."
+            APP_ID=$(echo "${RESPONSE}" | jq -r ".[] | select(.name == \"${APP_NAME}\") | .id" | head -1)
+          elif echo "${RESPONSE}" | jq -e 'type == "object"' > /dev/null 2>&1; then
+            echo "Response is an object, checking for applications array..."
+            APP_ID=$(echo "${RESPONSE}" | jq -r ".applications[]? | select(.name == \"${APP_NAME}\") | .id" | head -1)
+            
+            # If not found, try data.applications
+            if [ -z "$APP_ID" ] || [ "$APP_ID" = "null" ]; then
+              APP_ID=$(echo "${RESPONSE}" | jq -r ".data.applications[]? | select(.name == \"${APP_NAME}\") | .id" | head -1)
+            fi
+          else
+            echo "⚠️ Unexpected response format from Concert API"
+          fi
           
           if [ -z "$APP_ID" ] || [ "$APP_ID" = "null" ]; then
             echo "⚠️ Could not find application '${APP_NAME}' in Concert"
+            echo "Available applications:"
+            echo "${RESPONSE}" | jq -r '.[].name // .applications[]?.name // .data.applications[]?.name // "Unable to parse"' 2>/dev/null || echo "Unable to list applications"
             echo "app_id=unknown" >> $GITHUB_OUTPUT
           else
             echo "✅ Found application ID: ${APP_ID}"
