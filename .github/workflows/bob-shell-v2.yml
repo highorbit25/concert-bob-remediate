@@ -343,6 +343,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+
+      - name: Create Concert API Credentials File
+        run: |
+          cat > .env << EOF
+          CONCERT_API_KEY="${{ secrets.CONCERT_API_KEY }}"
+          CONCERT_HOSTNAME="${{ vars.CONCERT_HOSTNAME }}"
+          CONCERT_INSTANCE_ID="${{ vars.CONCERT_INSTANCE_ID }}"
+          EOF
+          echo "✅ Concert API credentials configured"
       
       - name: Run Bob Shell - Update Concert API for False Positives
         id: bob-concert-update
