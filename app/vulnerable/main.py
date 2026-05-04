@@ -33,8 +33,8 @@ def init_db():
 
 @app.route('/')
 def index():
-    # VULNERABILITY 3: Using deprecated Flask attribute (Breaking change in Flask 2.0+)
-    if request.is_xhr:
+    # VULNERABILITY 3: Flask 3.x removed request.is_xhr, use the request header directly
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return 'This was an AJAX request'
     return '''
         <h1>Vulnerable Flask App</h1>
