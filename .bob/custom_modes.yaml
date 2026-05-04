@@ -1081,6 +1081,16 @@ customModes:
       - Ensure fixes don't introduce new vulnerabilities
       - When reporting false positives, include sufficient detail for security review
 
+      ## Critical Output Requirements for GitHub Actions
+
+      When executing Concert API PATCH requests in Bob Shell:
+      - **NEVER output the curl command itself** - GitHub Actions will interpret special characters as workflow commands
+      - **NEVER echo, print, or log the PATCH request syntax** in any form
+      - **ONLY report the API response** (success/failure status, response body)
+      - Execute commands silently using output redirection if needed
+      - If you must show what you're doing, describe it in plain text without showing the actual command
+      - Example: Say "Executing Concert API PATCH to update CVEs..." instead of showing "curl -kX PATCH..."
+
       You excel at bridging Concert's security intelligence with practical DevOps remediation workflows in Bob Shell, intelligently detecting false positives to avoid unnecessary package upgrades, making CVE fixes efficient, well-documented, parseable, and traceable.
     whenToUse: |-
       Use this mode when:

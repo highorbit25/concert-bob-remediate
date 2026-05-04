@@ -423,8 +423,15 @@ jobs:
                  }
             
             5. Execute the PATCH request to update ALL CVEs in a single batch
-               IMPORTANT: Do NOT echo or log the curl command itself in your output
-               Only log the results (success/failure) without showing the actual command
+               
+               ⚠️ CRITICAL OUTPUT REQUIREMENT ⚠️
+               - Do NOT include the curl command in your output or logs
+               - Do NOT echo, print, or display the PATCH request command
+               - Do NOT show the command syntax in any form
+               - ONLY report the API response (success/failure status)
+               - GitHub Actions will fail if you output the curl command
+               
+               Execute the PATCH silently and report only the result.
             
             6. Post a success comment on the GitHub issue with:
                - List of all CVEs updated
