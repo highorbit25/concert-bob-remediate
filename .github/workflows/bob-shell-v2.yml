@@ -203,45 +203,40 @@ jobs:
             echo "✅ True positive - PR #${PR_NUMBER} was created"
           fi
       
-      # - name: Add False Positive Approval Request Comment
-      #   if: steps.check-false-positive.outputs.false_positive_detected == 'true'
-      #   uses: actions/github-script@v7
-      #   with:
-      #     github-token: ${{ secrets.GITHUB_TOKEN }}
-      #     script: |
-      #       const issueNumber = Number(`${{ steps.get-issue.outputs.issue_number }}`.trim());
+      - name: Add False Positive Approval Request Comment
+        if: steps.check-false-positive.outputs.false_positive_detected == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issueNumber = Number(`${{ steps.get-issue.outputs.issue_number }}`.trim());
             
-      #       await github.rest.issues.addLabels({
-      #         owner: context.repo.owner,
-      #         repo: context.repo.repo,
-      #         issue_number: issueNumber,
-      #         labels: ['pending-devops-review']
-      #       });
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              labels: ['pending-devops-review']
+            });
             
-      #       await github.rest.issues.createComment({
-      #         owner: context.repo.owner,
-      #         repo: context.repo.repo,
-      #         issue_number: issueNumber,
-      #         body: `## 🔐 DevOps Approval Required - False Positive Confirmation
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: `## 🔐 DevOps Approval Required - False Positive Confirmation
               
-      #         Bob has analyzed this CVE and determined it is a **false positive**.
+              Bob has analyzed this CVE and determined it is a **false positive**.
               
-      #         **Next Steps:**
-      #         1. DevOps Engineer: Review Bob's analysis above
-      #         2. If you agree, approve the protected \`devops-approval\` environment in the workflow run
-      #         3. This will update Concert API to mark the CVE as "False positive"
+              **Next Steps:**
+              1. DevOps Engineer: Review Bob's analysis above
+              2. If you agree, approve the protected \`devops-approval\` environment in the workflow run
+              3. This will update Concert API to mark the CVE as "False positive"
               
-      #         **To approve the workflow:** Open the current workflow run and use the **Review deployments** approval for the \`devops-approval\` environment
+              **To approve the workflow:** Open the current workflow run and use the **Review deployments** approval for the \`devops-approval\` environment
               
-      #         ⏸️ Workflow paused - waiting for environment approval
-              
-      #         Once approved, workflow will:
-      #         - Update Concert API vulnerability assessment
-      #         - Mark CVE as "False positive"
-      #         - Close this issue`
-      #       });
+              ⏸️ Workflow paused - waiting for environment approval
+            });
             
-      #       core.info(`Added false-positive approval request to issue #${issueNumber}`);
+            core.info(`Added false-positive approval request to issue #${issueNumber}`);
       
       - name: Validate PR Creation
         if: steps.check-false-positive.outputs.false_positive_detected == 'false'
@@ -294,19 +289,19 @@ jobs:
               - Request Software Lead review`
             });
       
-      - name: Request DevOps Review
-        if: steps.check-false-positive.outputs.false_positive_detected == 'false'
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const prNumber = ${{ steps.bob-devops.outputs.pr_number }};
-            await github.rest.pulls.requestReviewers({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: prNumber,
-              reviewers: ${{ vars.DEVOPS_REVIEWERS }}  // DevOps Team
-            });
+      # - name: Request DevOps Review
+      #   if: steps.check-false-positive.outputs.false_positive_detected == 'false'
+      #   uses: actions/github-script@v7
+      #   with:
+      #     github-token: ${{ secrets.GITHUB_TOKEN }}
+      #     script: |
+      #       const prNumber = ${{ steps.bob-devops.outputs.pr_number }};
+      #       await github.rest.pulls.requestReviewers({
+      #         owner: context.repo.owner,
+      #         repo: context.repo.repo,
+      #         pull_number: prNumber,
+      #         reviewers: ${{ vars.DEVOPS_REVIEWERS }}  // DevOps Team
+      #       });
       
       - name: Add workflow metadata label
         if: steps.check-false-positive.outputs.false_positive_detected == 'false'
@@ -352,6 +347,34 @@ jobs:
           CONCERT_INSTANCE_ID="${{ vars.CONCERT_INSTANCE_ID }}"
           EOF
           echo "✅ Concert API credentials configured"
+
+      - name: Mark Approval Received
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issueNumber = Number(`${{ needs.devops-cve-research.outputs.issue_number }}`.trim());
+            
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                name: 'pending-devops-review'
+              });
+            } catch (e) {
+              core.info(`Label may not exist: ${e.message}`);
+            }
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: `## ✅ DevOps Approval Received!
+              
+              🔄 Updating Concert Dashboard to mark CVE(s) as false positive...`
+            });
+      
       
       - name: Run Bob Shell - Update Concert API for False Positives
         id: bob-concert-update
@@ -393,7 +416,7 @@ jobs:
                        "status": "False positive",
                        "application_id": "...",
                        "cve": "CVE-XXXX-XXXXX",
-                       "comment": "DevOps-approved false positive. See https://github.com/${{ github.repository }}/issues/${{ needs.devops-cve-research.outputs.issue_number }}"
+                       "comment": "See https://github.com/${{ github.repository }}/issues/${{ needs.devops-cve-research.outputs.issue_number }}"
                      },
                      ... (one object for each CVE)
                    ]

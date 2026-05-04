@@ -76,7 +76,6 @@ After analyzing the codebase, I've determined this CVE is a **false positive** f
 
 **What happens after approval:**
 - Concert API will be updated: Status = "False positive"
-- Issue will be labeled: `concert-updated`, `false-positive-confirmed`
 - Issue will be closed automatically
 
 ---
