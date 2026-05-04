@@ -338,6 +338,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       
       - name: Run Bob Shell - Update Concert API for False Positives
         id: bob-concert-update
