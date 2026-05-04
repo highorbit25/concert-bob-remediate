@@ -47,9 +47,6 @@
       <steps>
         <step>Create detailed analysis comment on GitHub issue</step>
         <step>Include evidence: file paths, code snippets, reasoning</step>
-        <step>Tag DevOps engineer for review</step>
-        <step>Request devops-approval environment approval if they agree</step>
-        <step>Explain Concert API update process</step>
         <step>Do NOT create branch or PR</step>
         <step>Do NOT output pr_number, pr_branch, or pr_url</step>
         <step>Exit workflow successfully</step>
@@ -145,9 +142,6 @@
       <requirement>Include specific file paths and line numbers</requirement>
       <requirement>Add code snippets showing non-vulnerable usage</requirement>
       <requirement>Explain why it's a false positive</requirement>
-      <requirement>Tag DevOps engineer for review</requirement>
-      <requirement>Request devops-approval environment approval if they agree</requirement>
-      <requirement>Explain Concert API update process</requirement>
     </github_issue_comment_requirements>
   </false_positive_flow_details>
 

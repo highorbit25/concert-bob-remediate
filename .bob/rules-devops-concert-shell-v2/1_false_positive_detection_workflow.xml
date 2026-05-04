@@ -331,8 +331,6 @@ search_files with:
           <step>Create detailed comment on GitHub issue with analysis</step>
           <step>Include all evidence and reasoning</step>
           <step>Tag DevOps engineer for review: @devops-engineer</step>
-          <step>Request they approve devops-approval environment if they agree</step>
-          <step>Explain that approval triggers Concert API update</step>
           <step>Do NOT create branch or PR</step>
           <step>Exit with status: FALSE_POSITIVE_DETECTED</step>
         </steps>

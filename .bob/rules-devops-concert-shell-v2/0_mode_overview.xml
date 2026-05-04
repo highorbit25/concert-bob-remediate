@@ -130,7 +130,6 @@
         <action>Create detailed comment on GitHub issue</action>
         <action>Include analysis, evidence, and reasoning</action>
         <action>Tag DevOps engineer for review</action>
-        <action>Request devops-approval environment approval if they agree</action>
         <action>Workflow pauses for approval</action>
         <action>After approval: Update Concert API and close issue</action>
       </false_positive_action>
