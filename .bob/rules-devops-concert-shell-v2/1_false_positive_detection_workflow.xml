@@ -357,20 +357,6 @@ After analyzing the codebase, I've determined this CVE is a **false positive** f
 **No action required.** The vulnerable code path is not reachable in our application.
 
 ---
-
-@devops-engineer Please review this analysis. If you agree this is a false positive:
-1. Approve the `devops-approval` environment in the workflow run
-2. Go to Actions tab → Find the running workflow → Click "Review deployments"
-3. The workflow will automatically update Concert API to mark this as false positive
-4. The issue will be closed automatically
-
-**Concert API Update Details:**
-- Endpoint: `PATCH /concert/ingestion/api/v1/vulnerability_assessments`
-- Status: "False positive"
-- CVE: {CVE-ID}
-- Application: {application-name}
-
----
 *Automated analysis by Bob DevOps Concert Shell V2*
           ]]>
         </comment_template>

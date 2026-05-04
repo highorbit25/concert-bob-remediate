@@ -233,7 +233,7 @@ jobs:
               
               **To approve the workflow:** Open the current workflow run and use the **Review deployments** approval for the \`devops-approval\` environment
               
-              ⏸️ Workflow paused - waiting for environment approval
+              ⏸️ Workflow paused - waiting for environment approval`
             });
             
             core.info(`Added false-positive approval request to issue #${issueNumber}`);
