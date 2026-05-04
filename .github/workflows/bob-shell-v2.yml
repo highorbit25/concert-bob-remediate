@@ -125,22 +125,30 @@ jobs:
                f. Select final remediation version based on Concert + NVD validation
             
             3. FALSE POSITIVE DETECTION (NEW):
-               a. Analyze source code to determine if CVE is a false positive
+               a. Analyze source code to determine if EACH CVE is a false positive
                b. Use search_files to find package imports and vulnerable function calls
                c. Read relevant files to understand usage patterns
-               d. Assess if vulnerable code paths are reachable
+               d. Assess if vulnerable code paths are reachable for EACH CVE
                e. Consider deployment context and security controls
-               f. Make determination: FALSE POSITIVE or TRUE POSITIVE
+               f. Make determination for EACH CVE: FALSE POSITIVE or TRUE POSITIVE
+               g. If package has MULTIPLE CVEs, analyze each one independently
             
-            4. IF FALSE POSITIVE:
-               a. Create detailed comment on GitHub issue with analysis
-               b. Include evidence: file paths, code snippets, reasoning
-               c. Tag DevOps engineer for review
-               d. Request they add 'false-positive' label if they agree
-               e. Explain that labeling triggers Concert API update
-               f. Do NOT create branch or PR
-               g. Do NOT output pr_number, pr_branch, or pr_url
-               h. Exit workflow - Bob has commented on the issue
+            4. IF ALL CVEs ARE FALSE POSITIVES:
+               a. Create detailed comment on GitHub issue with analysis for EACH CVE
+               b. CRITICAL: Comment MUST include a clear "False Positive CVEs" section listing ALL CVE IDs
+               c. Format: List each CVE clearly (e.g., "CVE-2023-32681", "CVE-2024-35195")
+               d. Include evidence for EACH CVE: file paths, code snippets, reasoning
+               e. Tag DevOps engineer for review
+               f. Request they approve the 'devops-approval' environment if they agree
+               g. Explain that approval triggers Concert API batch update for ALL CVEs
+               h. Do NOT create branch or PR
+               i. Do NOT output pr_number, pr_branch, or pr_url
+               j. Exit workflow - Bob has commented on the issue
+            
+            4b. IF ANY CVE IS A TRUE POSITIVE:
+               a. Proceed with package upgrade (fixes all CVEs)
+               b. Document which CVEs are being fixed
+               c. Note any false positive CVEs in PR description
             
             5. IF TRUE POSITIVE - Apply the package fix:
                a. Apply the package fix to the manifest files (requirements.txt, package.json, etc.)
