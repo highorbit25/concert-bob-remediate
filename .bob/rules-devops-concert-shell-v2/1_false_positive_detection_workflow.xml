@@ -330,9 +330,9 @@ search_files with:
         <steps>
           <step>Create detailed comment on GitHub issue with analysis</step>
           <step>Include all evidence and reasoning</step>
-          <step>Tag DevOps engineer for review: @{engineer}</step>
-          <step>Request they add 'false-positive' label if they agree</step>
-          <step>Explain that labeling triggers Concert API update</step>
+          <step>Tag DevOps engineer for review: @devops-engineer</step>
+          <step>Request they approve devops-approval environment if they agree</step>
+          <step>Explain that approval triggers Concert API update</step>
           <step>Do NOT create branch or PR</step>
           <step>Exit with status: FALSE_POSITIVE_DETECTED</step>
         </steps>
@@ -358,10 +358,11 @@ After analyzing the codebase, I've determined this CVE is a **false positive** f
 
 ---
 
-@{engineer-username} Please review this analysis. If you agree this is a false positive:
-1. Add the `false-positive` label to this issue
-2. This will trigger the `downgrade-false-positive` workflow
-3. The workflow will update Concert API to mark this as false positive
+@devops-engineer Please review this analysis. If you agree this is a false positive:
+1. Approve the `devops-approval` environment in the workflow run
+2. Go to Actions tab → Find the running workflow → Click "Review deployments"
+3. The workflow will automatically update Concert API to mark this as false positive
+4. The issue will be closed automatically
 
 **Concert API Update Details:**
 - Endpoint: `PATCH /concert/ingestion/api/v1/vulnerability_assessments`

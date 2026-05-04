@@ -66,19 +66,18 @@ After analyzing the codebase, I've determined this CVE is a **false positive** f
 
 ### 🎯 Next Steps
 
-@{engineer-username} Please review this analysis. If you agree this is a false positive:
+@devops-engineer Please review this analysis. If you agree this is a false positive:
 
-1. **Add the `false-positive` label** to this issue
-2. This will trigger the `downgrade-false-positive` GitHub Actions workflow
-3. The workflow will update Concert API to mark this CVE as false positive
+1. **Approve the `devops-approval` environment** in the workflow run
+2. Go to the Actions tab → Find the running workflow
+3. Click "Review deployments" and approve the `devops-approval` environment
+4. The workflow will automatically update Concert API to mark this CVE as false positive
+5. The issue will be closed automatically after Concert is updated
 
-**Concert API Update Details:**
-- **Endpoint**: `PATCH /concert/ingestion/api/v1/vulnerability_assessments`
-- **Status**: "False positive"
-- **CVE**: {CVE-ID}
-- **Application**: {application-name}
-
-If you disagree with this analysis, please comment with your concerns and I can re-analyze.
+**What happens after approval:**
+- Concert API will be updated: Status = "False positive"
+- Issue will be labeled: `concert-updated`, `false-positive-confirmed`
+- Issue will be closed automatically
 
 ---
 
@@ -138,7 +137,7 @@ search_files:
 
 ### 🎯 Next Steps
 
-@{engineer} If you agree, please add the `false-positive` label to trigger Concert API update.
+@devops-engineer If you agree, please approve the `devops-approval` environment in the workflow run to trigger Concert API update.
         ]]>
       </content>
     </template>
@@ -187,7 +186,7 @@ While our application uses `{package-name}`, it does **not use the vulnerable fe
 
 ### 🎯 Next Steps
 
-@{engineer} If you agree, please add the `false-positive` label to trigger Concert API update.
+@devops-engineer If you agree, please approve the `devops-approval` environment in the workflow run to trigger Concert API update.
         ]]>
       </content>
     </template>
@@ -245,7 +244,7 @@ The vulnerable function is only reachable after input passes through security co
 
 ### 🎯 Next Steps
 
-@{engineer} If you agree, please add the `false-positive` label to trigger Concert API update.
+@devops-engineer If you agree, please approve the `devops-approval` environment in the workflow run to trigger Concert API update.
         ]]>
       </content>
     </template>
@@ -301,7 +300,7 @@ Internet → Firewall → VPN → Internal Network → This Service
 
 ### 🎯 Next Steps
 
-@{engineer} If you agree, please add the `false-positive` label to trigger Concert API update.
+@devops-engineer If you agree, please approve the `devops-approval` environment in the workflow run to trigger Concert API update.
         ]]>
       </content>
     </template>
@@ -352,7 +351,7 @@ Application Start → Load Config → Check {feature-name}
 
 ### 🎯 Next Steps
 
-@{engineer} If you agree, please add the `false-positive` label to trigger Concert API update.
+@devops-engineer If you agree, please approve the `devops-approval` environment in the workflow run to trigger Concert API update.
         ]]>
       </content>
     </template>
@@ -510,17 +509,16 @@ def get_data():
 
 @devops-engineer Please review this analysis. If you agree this is a false positive:
 
-1. **Add the `false-positive` label** to this issue
-2. This will trigger the `downgrade-false-positive` GitHub Actions workflow
-3. The workflow will update Concert API to mark this CVE as false positive
+1. **Approve the `devops-approval` environment** in the workflow run
+2. Go to Actions tab → Find the running workflow → Click "Review deployments"
+3. The workflow will automatically update Concert API to mark this CVE as false positive
+4. The issue will be closed automatically after Concert is updated
 
 **Concert API Update Details:**
 - **Endpoint**: `PATCH /concert/ingestion/api/v1/vulnerability_assessments`
 - **Status**: "False positive"
 - **CVE**: CVE-2023-30861
 - **Application**: my-flask-app
-
-If you disagree with this analysis, please comment with your concerns and I can re-analyze.
 
 ---
 

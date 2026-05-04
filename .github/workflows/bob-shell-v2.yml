@@ -193,20 +193,45 @@ jobs:
             echo "✅ True positive - PR #${PR_NUMBER} was created"
           fi
       
-      - name: Add False Positive Label
+      - name: Add False Positive Approval Request Comment
         if: steps.check-false-positive.outputs.false_positive_detected == 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const issueNumber = Number(`${{ steps.get-issue.outputs.issue_number }}`.trim());
+            
             await github.rest.issues.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issueNumber,
-              labels: ['false-positive-candidate', 'awaiting-devops-review']
+              labels: ['false-positive-candidate', 'pending-devops-review']
             });
-            core.info(`Added false-positive-candidate label to issue #${issueNumber}`);
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: `## 🔐 DevOps Approval Required - False Positive Confirmation
+              
+              Bob has analyzed this CVE and determined it is a **false positive**.
+              
+              **Next Steps:**
+              1. DevOps Engineer: Review Bob's analysis above
+              2. If you agree, approve the protected \`devops-approval\` environment in the workflow run
+              3. This will update Concert API to mark the CVE as "False positive"
+              
+              **To approve the workflow:** Open the current workflow run and use the **Review deployments** approval for the \`devops-approval\` environment
+              
+              ⏸️ Workflow paused - waiting for environment approval
+              
+              Once approved, workflow will:
+              - Update Concert API vulnerability assessment
+              - Mark CVE as "False positive"
+              - Close this issue`
+            });
+            
+            core.info(`Added false-positive approval request to issue #${issueNumber}`);
       
       - name: Validate PR Creation
         if: steps.check-false-positive.outputs.false_positive_detected == 'false'
@@ -288,10 +313,400 @@ jobs:
             });
 
   # ============================================================================
-  # STEP 2: DevOps Environment Approval Gate
+  # STEP 2A: False Positive Approval Gate & Concert Update
+  # ============================================================================
+  false-positive-approval-gate:
+    name: "2A: False Positive - DevOps Approval & Concert Update"
+    runs-on: ubuntu-latest
+    needs: devops-cve-research
+    if: |
+      needs.devops-cve-research.result == 'success' &&
+      needs.devops-cve-research.outputs.false_positive_detected == 'true'
+    environment:
+      name: devops-approval
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Extract CVE Info from Bob's Comment
+        id: extract-info
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issueNumber = Number(`${{ needs.devops-cve-research.outputs.issue_number }}`.trim());
+            
+            // Get issue details
+            const { data: issue } = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber
+            });
+            
+            // Get all comments to find Bob's false positive analysis
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber
+            });
+            
+            // Find Bob's false positive comment (contains "False Positive Detection")
+            const bobComment = comments.find(c =>
+              c.body.includes('🔍 False Positive Detection') ||
+              c.body.includes('False Positive Analysis')
+            );
+            
+            if (!bobComment) {
+              core.setFailed('Could not find Bob\'s false positive analysis comment');
+              return;
+            }
+            
+            const commentBody = bobComment.body;
+            
+            // Extract all CVE IDs from the comment
+            const cveMatches = [...commentBody.matchAll(/CVE[- ](\d{4})[- ](\d+)/gi)];
+            const cveIds = [...new Set(cveMatches.map(m => `CVE-${m[1]}-${m[2]}`))];
+            
+            if (cveIds.length === 0) {
+              core.setFailed('Could not extract any CVE IDs from Bob\'s comment');
+              return;
+            }
+            
+            // Extract package name from issue body
+            const issueBody = issue.body || '';
+            const packageMatch = issueBody.match(/\*\*Package\*\*:\s*`?([a-zA-Z0-9_-]+)`?/i);
+            const packageName = packageMatch ? packageMatch[1] : 'unknown';
+            
+            // Extract application name from issue body
+            const appMatch = issueBody.match(/\*\*Application\*\*:\s*([a-zA-Z0-9_-]+)/i);
+            const applicationName = appMatch ? appMatch[1] : 'vulnerable-flask-app';
+            
+            core.info(`Extracted ${cveIds.length} CVE(s): ${cveIds.join(', ')}`);
+            core.info(`Extracted Package: ${packageName}`);
+            core.info(`Extracted Application: ${applicationName}`);
+            
+            // Output as JSON array for processing
+            core.setOutput('cve_ids', JSON.stringify(cveIds));
+            core.setOutput('cve_count', cveIds.length);
+            core.setOutput('package_name', packageName);
+            core.setOutput('application_name', applicationName);
+            core.setOutput('issue_number', issueNumber);
+            core.setOutput('issue_url', issue.html_url);
+      
+      - name: Query Concert API for Application ID
+        id: get-app-id
+        run: |
+          echo "🔍 Querying Concert API for application ID..."
+          
+          CONCERT_API_KEY="${{ secrets.CONCERT_API_KEY }}"
+          CONCERT_HOSTNAME="${{ vars.CONCERT_HOSTNAME }}"
+          CONCERT_INSTANCE_ID="${{ vars.CONCERT_INSTANCE_ID }}"
+          
+          RESPONSE=$(curl -ksSL -X GET \
+            -H "Authorization: ${CONCERT_API_KEY}" \
+            -H "InstanceId: ${CONCERT_INSTANCE_ID}" \
+            "${CONCERT_HOSTNAME}/concert/core/api/v1/applications")
+          
+          APP_NAME="${{ steps.extract-info.outputs.application_name }}"
+          APP_ID=$(echo "${RESPONSE}" | jq -r ".[] | select(.name == \"${APP_NAME}\") | .id" | head -1)
+          
+          if [ -z "$APP_ID" ] || [ "$APP_ID" = "null" ]; then
+            echo "⚠️ Could not find application '${APP_NAME}' in Concert"
+            echo "app_id=unknown" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Found application ID: ${APP_ID}"
+            echo "app_id=${APP_ID}" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Query Concert API for Vulnerability Details (All CVEs)
+        id: get-vuln-details
+        if: steps.get-app-id.outputs.app_id != 'unknown'
+        run: |
+          echo "🔍 Querying Concert API for vulnerability details..."
+          
+          CONCERT_API_KEY="${{ secrets.CONCERT_API_KEY }}"
+          CONCERT_HOSTNAME="${{ vars.CONCERT_HOSTNAME }}"
+          CONCERT_INSTANCE_ID="${{ vars.CONCERT_INSTANCE_ID }}"
+          APP_ID="${{ steps.get-app-id.outputs.app_id }}"
+          
+          # Get all vulnerability details for the application
+          RESPONSE=$(curl -ksSL -X GET \
+            -H "Authorization: ${CONCERT_API_KEY}" \
+            -H "InstanceId: ${CONCERT_INSTANCE_ID}" \
+            "${CONCERT_HOSTNAME}/concert/core/api/v1/applications/${APP_ID}/vulnerability_details")
+          
+          # Parse CVE IDs from the extracted info
+          CVE_IDS='${{ steps.extract-info.outputs.cve_ids }}'
+          
+          # Build JSON array of assessment objects
+          ASSESSMENTS="[]"
+          FOUND_COUNT=0
+          MISSING_CVES=""
+          
+          for CVE_ID in $(echo "${CVE_IDS}" | jq -r '.[]'); do
+            echo "Processing ${CVE_ID}..."
+            
+            FINDINGS_ID=$(echo "${RESPONSE}" | jq -r ".[] | select(.cve == \"${CVE_ID}\") | .findings_id" | head -1)
+            ASSESSMENT_ID=$(echo "${RESPONSE}" | jq -r ".[] | select(.cve == \"${CVE_ID}\") | .assessment_id" | head -1)
+            
+            if [ -n "$FINDINGS_ID" ] && [ "$FINDINGS_ID" != "null" ]; then
+              echo "✅ Found ${CVE_ID}: findings_id=${FINDINGS_ID}, assessment_id=${ASSESSMENT_ID}"
+              
+              # Add to assessments array
+              ASSESSMENT_OBJ=$(jq -n \
+                --arg findings_id "$FINDINGS_ID" \
+                --arg assessment_id "$ASSESSMENT_ID" \
+                --arg cve "$CVE_ID" \
+                '{findings_id: $findings_id, assessment_id: $assessment_id, cve: $cve}')
+              
+              ASSESSMENTS=$(echo "${ASSESSMENTS}" | jq --argjson obj "$ASSESSMENT_OBJ" '. + [$obj]')
+              FOUND_COUNT=$((FOUND_COUNT + 1))
+            else
+              echo "⚠️ Could not find ${CVE_ID} in Concert"
+              MISSING_CVES="${MISSING_CVES}${CVE_ID} "
+            fi
+          done
+          
+          echo "assessments_json=${ASSESSMENTS}" >> $GITHUB_OUTPUT
+          echo "found_count=${FOUND_COUNT}" >> $GITHUB_OUTPUT
+          echo "missing_cves=${MISSING_CVES}" >> $GITHUB_OUTPUT
+          
+          if [ "$FOUND_COUNT" -eq 0 ]; then
+            echo "❌ No CVEs found in Concert"
+            echo "status=none_found" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Found ${FOUND_COUNT} CVE(s) in Concert"
+            echo "status=found" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Update Concert Vulnerability Assessments (Batch)
+        id: update-assessment
+        if: |
+          steps.get-app-id.outputs.app_id != 'unknown' &&
+          steps.get-vuln-details.outputs.status == 'found'
+        run: |
+          echo "📝 Updating Concert vulnerability assessments to 'False positive'..."
+          
+          CONCERT_API_KEY="${{ secrets.CONCERT_API_KEY }}"
+          CONCERT_HOSTNAME="${{ vars.CONCERT_HOSTNAME }}"
+          CONCERT_INSTANCE_ID="${{ vars.CONCERT_INSTANCE_ID }}"
+          
+          APP_ID="${{ steps.get-app-id.outputs.app_id }}"
+          ISSUE_URL="${{ steps.extract-info.outputs.issue_url }}"
+          ASSESSMENTS_JSON='${{ steps.get-vuln-details.outputs.assessments_json }}'
+          
+          # Build the assessments array with full details
+          ASSESSMENTS="[]"
+          for row in $(echo "${ASSESSMENTS_JSON}" | jq -r '.[] | @base64'); do
+            _jq() {
+              echo "${row}" | base64 --decode | jq -r "${1}"
+            }
+            
+            FINDINGS_ID=$(_jq '.findings_id')
+            ASSESSMENT_ID=$(_jq '.assessment_id')
+            CVE_ID=$(_jq '.cve')
+            
+            ASSESSMENT_OBJ=$(jq -n \
+              --arg findings_id "$FINDINGS_ID" \
+              --arg assessment_id "$ASSESSMENT_ID" \
+              --arg status "False positive" \
+              --arg app_id "$APP_ID" \
+              --arg cve "$CVE_ID" \
+              --arg comment "DevOps-approved false positive. Automated analysis by Bob. Package not used in application code. See ${ISSUE_URL}" \
+              '{
+                findings_id: $findings_id,
+                assessment_id: $assessment_id,
+                status: $status,
+                application_id: $app_id,
+                cve: $cve,
+                comment: $comment
+              }')
+            
+            ASSESSMENTS=$(echo "${ASSESSMENTS}" | jq --argjson obj "$ASSESSMENT_OBJ" '. + [$obj]')
+          done
+          
+          PAYLOAD=$(jq -n --argjson assessments "$ASSESSMENTS" '{assessments: $assessments}')
+          
+          echo "Payload:"
+          echo "${PAYLOAD}" | jq '.'
+          
+          RESPONSE=$(curl -ksSL -X PATCH \
+            -H "Authorization: ${CONCERT_API_KEY}" \
+            -H "InstanceId: ${CONCERT_INSTANCE_ID}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            "${CONCERT_HOSTNAME}/concert/ingestion/api/v1/vulnerability_assessments" \
+            -d "${PAYLOAD}")
+          
+          echo "Response:"
+          echo "${RESPONSE}" | jq '.' || echo "${RESPONSE}"
+          
+          # Count successful updates
+          UPDATED_COUNT=$(echo "${ASSESSMENTS}" | jq 'length')
+          echo "updated_count=${UPDATED_COUNT}" >> $GITHUB_OUTPUT
+          
+          if echo "${RESPONSE}" | jq -e '.success' > /dev/null 2>&1; then
+            echo "✅ Successfully updated ${UPDATED_COUNT} Concert vulnerability assessment(s)"
+            echo "status=success" >> $GITHUB_OUTPUT
+          elif echo "${RESPONSE}" | jq -e '.error' > /dev/null 2>&1; then
+            ERROR_MSG=$(echo "${RESPONSE}" | jq -r '.error')
+            echo "❌ Concert API returned error: ${ERROR_MSG}"
+            echo "status=error" >> $GITHUB_OUTPUT
+            echo "error_message=${ERROR_MSG}" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Concert API call completed for ${UPDATED_COUNT} CVE(s)"
+            echo "status=completed" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Post Success Comment and Close Issue
+        if: steps.update-assessment.outputs.status == 'success' || steps.update-assessment.outputs.status == 'completed'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issueNumber = ${{ steps.extract-info.outputs.issue_number }};
+            const cveIds = JSON.parse('${{ steps.extract-info.outputs.cve_ids }}');
+            const appId = '${{ steps.get-app-id.outputs.app_id }}';
+            const updatedCount = '${{ steps.update-assessment.outputs.updated_count }}';
+            const assessmentsJson = JSON.parse('${{ steps.get-vuln-details.outputs.assessments_json }}');
+            const missingCves = '${{ steps.get-vuln-details.outputs.missing_cves }}'.trim();
+            
+            // Remove pending label
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                name: 'pending-devops-review'
+              });
+            } catch (e) {
+              core.info(`Label may not exist: ${e.message}`);
+            }
+            
+            // Build CVE details list
+            let cveDetailsList = assessmentsJson.map(a =>
+              `- **${a.cve}**: findings_id=${a.findings_id}, assessment_id=${a.assessment_id}`
+            ).join('\n');
+            
+            let warningSection = '';
+            if (missingCves) {
+              warningSection = `\n### ⚠️ CVEs Not Found in Concert\nThe following CVEs were not found in Concert and were not updated:\n${missingCves.split(' ').filter(c => c).map(c => `- ${c}`).join('\n')}\n`;
+            }
+            
+            // Add success comment
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: `## ✅ DevOps Approval Received - Concert Updated
+              
+              ${updatedCount} vulnerability assessment(s) have been updated in Concert to **False positive**.
+              
+              ### Update Details
+              - **Application ID**: ${appId}
+              - **CVEs Updated**: ${updatedCount}
+              - **Status**: False positive
+              - **Updated**: ${new Date().toISOString()}
+              
+              ### CVE Details
+              ${cveDetailsList}
+              ${warningSection}
+              ### Concert Dashboard
+              You can verify these changes in the Concert dashboard under vulnerability assessments.
+              
+              This issue will now be closed as the false positive(s) have been confirmed and recorded.
+              
+              ---
+              *Automated by bob-shell-v2 workflow*`
+            });
+            
+            // Add labels
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              labels: ['concert-updated', 'false-positive-confirmed']
+            });
+            
+            // Close the issue
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              state: 'closed'
+            });
+      
+      - name: Post Error Comment
+        if: |
+          steps.get-app-id.outputs.app_id == 'unknown' ||
+          steps.get-vuln-details.outputs.status == 'none_found' ||
+          steps.update-assessment.outputs.status == 'error'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issueNumber = ${{ steps.extract-info.outputs.issue_number }};
+            const cveIds = JSON.parse('${{ steps.extract-info.outputs.cve_ids }}');
+            const appId = '${{ steps.get-app-id.outputs.app_id }}';
+            const vulnStatus = '${{ steps.get-vuln-details.outputs.status }}';
+            const errorMsg = '${{ steps.update-assessment.outputs.error_message }}';
+            const missingCves = '${{ steps.get-vuln-details.outputs.missing_cves }}'.trim();
+            
+            let errorDetails = '';
+            if (appId === 'unknown') {
+              errorDetails = '- Could not find application in Concert API';
+            } else if (vulnStatus === 'none_found') {
+              errorDetails = `- Could not find any of the CVEs (${cveIds.join(', ')}) for application ${appId}`;
+            } else if (errorMsg) {
+              errorDetails = `- Concert API error: ${errorMsg}`;
+            }
+            
+            let cveList = cveIds.map(c => `- ${c}`).join('\n');
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: `## ⚠️ Concert API Update Failed
+              
+              DevOps approval was received, but Concert API update failed.
+              
+              ### Error Details
+              ${errorDetails}
+              
+              ### CVEs to Update
+              ${cveList}
+              
+              ### Manual Steps Required
+              Please manually update the vulnerability assessments in Concert:
+              1. Log into Concert dashboard
+              2. Navigate to Vulnerability Assessments
+              3. Find each CVE listed above
+              4. Update status to "False positive"
+              5. Add comment referencing this issue
+              
+              ### Debug Information
+              - **CVE**: ${cveId}
+              - **Application ID**: ${appId}
+              - **Findings ID**: ${findingsId}
+              
+              ---
+              *Automated by bob-shell-v2 workflow*`
+            });
+            
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              labels: ['concert-update-failed', 'needs-manual-update']
+            });
+
+  # ============================================================================
+  # STEP 2B: True Positive - DevOps Environment Approval Gate
   # ============================================================================
   devops-approval-gate:
-    name: "2: Pause for DevOps Approval"
+    name: "2B: True Positive - Pause for DevOps Approval"
     runs-on: ubuntu-latest
     needs: devops-cve-research
     if: |

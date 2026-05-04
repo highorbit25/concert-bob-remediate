@@ -796,60 +796,75 @@ customModes:
 
       ### Step 1: Analyze CVE Context
       - Extract vulnerable package name, version, and CVE details from GitHub issue
-      - Identify the specific vulnerability type (RCE, XSS, SQLi, etc.)
-      - Determine which functions/methods/APIs are vulnerable
-      - Understand the attack vector and exploitation requirements
+      - **IMPORTANT**: A single package may have MULTIPLE CVEs - analyze each one
+      - Identify the specific vulnerability type for each CVE (RCE, XSS, SQLi, etc.)
+      - Determine which functions/methods/APIs are vulnerable for each CVE
+      - Understand the attack vector and exploitation requirements for each CVE
 
       ### Step 2: Search Codebase for Usage
       - Use [`search_files`](search_files) to find all imports/requires of the vulnerable package
       - Identify all files that use the package
-      - Search for specific vulnerable function calls mentioned in CVE
+      - Search for specific vulnerable function calls mentioned in each CVE
       - Check configuration files for relevant settings
+      - **Note**: The same package usage analysis applies to all CVEs for that package
 
-      ### Step 3: Analyze Usage Patterns
+      ### Step 3: Analyze Usage Patterns (Per CVE)
       - Read identified files to understand how the package is used
-      - Determine if vulnerable functions are actually called
-      - Check if vulnerable code paths are reachable
-      - Assess if security controls mitigate the vulnerability
+      - For EACH CVE, determine if its specific vulnerable functions are called
+      - Check if vulnerable code paths for each CVE are reachable
+      - Assess if security controls mitigate each specific vulnerability
       - Evaluate deployment context (e.g., internal-only service)
+      - **CRITICAL**: Different CVEs may have different false positive determinations
 
-      ### Step 4: Make False Positive Determination
-      **Criteria for False Positive:**
+      ### Step 4: Make False Positive Determination (Per CVE)
+      **Analyze EACH CVE independently:**
+      
+      **Criteria for False Positive (for a specific CVE):**
       - Package is a transitive dependency never directly imported
-      - Vulnerable functions are not called anywhere in the codebase
-      - Vulnerable code paths are unreachable due to configuration
-      - Security controls (WAF, input validation) prevent exploitation
-      - Service is not exposed to untrusted input
-      - Deployment context makes exploitation impossible
+      - Vulnerable functions specific to this CVE are not called anywhere
+      - Vulnerable code paths for this CVE are unreachable due to configuration
+      - Security controls (WAF, input validation) prevent exploitation of this CVE
+      - Service is not exposed to untrusted input required by this CVE
+      - Deployment context makes exploitation of this CVE impossible
 
-      **Criteria for True Positive:**
+      **Criteria for True Positive (for a specific CVE):**
       - Package is directly used in application code
-      - Vulnerable functions are called
-      - Vulnerable code paths are reachable
-      - No mitigating controls in place
-      - Service is exposed to untrusted input
+      - Vulnerable functions specific to this CVE are called
+      - Vulnerable code paths for this CVE are reachable
+      - No mitigating controls in place for this CVE
+      - Service is exposed to untrusted input required by this CVE
 
-      ### Step 5: Document Analysis
-      - Create detailed analysis of code usage
-      - Document why it's a false positive with specific evidence
+      **Mixed Scenarios:**
+      - Some CVEs may be false positives while others are true positives for the same package
+      - Analyze each CVE independently and document findings separately
+      - If ANY CVE is a true positive, proceed with package upgrade for all CVEs
+
+      ### Step 5: Document Analysis (Per CVE)
+      - Create detailed analysis for EACH CVE
+      - Document why each CVE is a false positive with specific evidence
       - Include file paths, line numbers, and code snippets
-      - Reference CVE details and exploitation requirements
-      - Explain why the vulnerability cannot be exploited
+      - Reference each CVE's details and exploitation requirements
+      - Explain why each vulnerability cannot be exploited
+      - **Format**: Use clear sections for each CVE in your comment
 
       ### Step 6: Comment on GitHub Issue
-      If determined to be a false positive:
-      - Post detailed comment on the GitHub issue
-      - Include analysis summary and evidence
+      **If ALL CVEs are determined to be false positives:**
+      - Post detailed comment on the GitHub issue with analysis for EACH CVE
+      - Use clear formatting to separate analysis for each CVE
+      - Include summary table showing all CVEs and their false positive status
+      - Include analysis summary and evidence for each CVE
       - Tag the DevOps engineer for review
-      - Request they add 'false-positive' label if they agree
-      - Explain that labeling will trigger the `downgrade-false-positive` GitHub Actions workflow
-      - The separate workflow will update Concert API to mark the CVE as false positive
+      - Request they approve the `devops-approval` environment if they agree
+      - Explain that approval will trigger the workflow to update Concert API for ALL CVEs
+      - The workflow will batch update all CVEs to "False positive" status in Concert
       - Do NOT proceed with package upgrade
       - Do NOT call Concert API directly from this mode
 
-      If determined to be a true positive:
+      **If ANY CVE is a true positive:**
       - Proceed with normal CVE remediation workflow
       - Create branch, update manifests, create PR
+      - Document which CVEs are being fixed
+      - Note any CVEs that were false positives in the PR description
 
       ## IBM Concert API Knowledge for Bob Shell CVE Remediation
 

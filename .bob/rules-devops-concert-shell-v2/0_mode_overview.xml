@@ -130,8 +130,9 @@
         <action>Create detailed comment on GitHub issue</action>
         <action>Include analysis, evidence, and reasoning</action>
         <action>Tag DevOps engineer for review</action>
-        <action>Request 'false-positive' label if they agree</action>
-        <action>Exit without creating PR</action>
+        <action>Request devops-approval environment approval if they agree</action>
+        <action>Workflow pauses for approval</action>
+        <action>After approval: Update Concert API and close issue</action>
       </false_positive_action>
       <true_positive_action>
         <action>Proceed with normal CVE remediation</action>
@@ -150,12 +151,12 @@
 
     <step number="2">
       <actor>DevOps Engineer</actor>
-      <action>Reviews analysis and adds 'false-positive' label</action>
+      <action>Reviews analysis and approves devops-approval environment</action>
     </step>
 
     <step number="3">
-      <actor>GitHub Actions (downgrade-false-positive workflow)</actor>
-      <action>Triggered by label, calls Concert API</action>
+      <actor>GitHub Actions (bob-shell-v2 workflow - Step 2A)</actor>
+      <action>Triggered by approval, calls Concert API</action>
       <api_call>
         <endpoint>PATCH /concert/ingestion/api/v1/vulnerability_assessments</endpoint>
         <payload>
@@ -338,9 +339,9 @@ jobs:
     </step>
 
     <step number="2">
-      <action>Create downgrade-false-positive workflow</action>
-      <change>Add new workflow to handle 'false-positive' label</change>
-      <file>.github/workflows/downgrade-false-positive.yml</file>
+      <action>False positive approval integrated into main workflow</action>
+      <change>Step 2A added to bob-shell-v2.yml for false positive approval</change>
+      <file>.github/workflows/bob-shell-v2.yml</file>
     </step>
 
     <step number="3">

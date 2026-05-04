@@ -48,7 +48,7 @@
         <step>Create detailed analysis comment on GitHub issue</step>
         <step>Include evidence: file paths, code snippets, reasoning</step>
         <step>Tag DevOps engineer for review</step>
-        <step>Request 'false-positive' label if they agree</step>
+        <step>Request devops-approval environment approval if they agree</step>
         <step>Explain Concert API update process</step>
         <step>Do NOT create branch or PR</step>
         <step>Do NOT output pr_number, pr_branch, or pr_url</step>
@@ -146,7 +146,7 @@
       <requirement>Add code snippets showing non-vulnerable usage</requirement>
       <requirement>Explain why it's a false positive</requirement>
       <requirement>Tag DevOps engineer for review</requirement>
-      <requirement>Request 'false-positive' label if they agree</requirement>
+      <requirement>Request devops-approval environment approval if they agree</requirement>
       <requirement>Explain Concert API update process</requirement>
     </github_issue_comment_requirements>
   </false_positive_flow_details>
@@ -306,9 +306,9 @@ flask==2.3.3  # Fixed CVE-2023-30861 per Concert recommendation
     </research_phase>
 
     <false_positive_update>
-      <description>False positive updates handled by separate workflow</description>
-      <trigger>DevOps engineer adds 'false-positive' label to issue</trigger>
-      <workflow>downgrade-false-positive.yml</workflow>
+      <description>False positive updates handled in same workflow after approval</description>
+      <trigger>DevOps engineer approves devops-approval environment</trigger>
+      <workflow>bob-shell-v2.yml (Step 2A)</workflow>
       <endpoint>PATCH /concert/ingestion/api/v1/vulnerability_assessments</endpoint>
       <payload>
         <![CDATA[
@@ -347,8 +347,10 @@ flask==2.3.3  # Fixed CVE-2023-30861 per Concert recommendation
     <false_positive_workflow_behavior>
       <step>check-false-positive step detects missing pr_number</step>
       <step>Sets false_positive_detected=true output</step>
-      <step>Adds 'false-positive-candidate' label to issue</step>
+      <step>Adds 'false-positive-candidate' and 'pending-devops-review' labels to issue</step>
+      <step>Posts approval request comment on issue</step>
       <step>Skips all PR-related steps (validation, comments, reviews)</step>
+      <step>Triggers Step 2A: False Positive Approval Gate</step>
       <step>Subsequent jobs don't run (approval gate, tests, fixes)</step>
       <step>Workflow completes successfully</step>
     </false_positive_workflow_behavior>
