@@ -15,7 +15,7 @@ jobs:
         env:
           CONCERT_API_KEY: ${{ secrets.CONCERT_API_KEY }}
           INSTANCE_ID: ${{ secrets.CONCERT_INSTANCE_ID || '0000-0000-0000-0000' }}
-          CONCERT_URL: ${{ vars.CONCERT_URL || 'https://162.133.134.251:12443' }}
+          CONCERT_URL: ${{ vars.CONCERT_HOSTNAME || 'https://162.133.134.251:12443' }}
           JOB_ID: ${{ vars.INGESTION_JOB_ID || '92073c05-78c1-4f1b-8408-89ed1341a592' }}
         run: |
           echo "Triggering Concert ingestion job..."
