@@ -1,0 +1,440 @@
+<complete_workflow_guide>
+  <overview>
+    Complete workflow guide for DevOps Concert Shell V2 mode covering both false positive
+    detection and true positive package remediation flows. This ensures Bob handles both
+    scenarios correctly in GitHub Actions automation.
+  </overview>
+
+  <workflow_decision_tree>
+    <title>CVE Processing Decision Tree</title>
+    
+    <start>
+      <action>Fetch GitHub issue with CVE details</action>
+      <next>research_cve</next>
+    </start>
+
+    <step id="research_cve">
+      <name>Research CVE</name>
+      <actions>
+        <action>Query Concert API for CVE details and recommendations</action>
+        <action>Query NVD API for official CVE validation</action>
+        <action>Query GitHub Advisory or OSV as fallback if needed</action>
+        <action>Cross-reference findings between sources</action>
+        <action>Identify vulnerable functions and attack vectors</action>
+      </actions>
+      <next>analyze_code</next>
+    </step>
+
+    <step id="analyze_code">
+      <name>Analyze Source Code for False Positive Detection</name>
+      <actions>
+        <action>Search codebase for package imports</action>
+        <action>Search for vulnerable function calls</action>
+        <action>Read relevant source files</action>
+        <action>Trace data flow to vulnerable functions</action>
+        <action>Assess exploitability and deployment context</action>
+      </actions>
+      <decision>
+        <question>Is this a false positive?</question>
+        <if_true>false_positive_flow</if_true>
+        <if_false>true_positive_flow</if_false>
+        <if_uncertain>true_positive_flow</if_uncertain>
+      </decision>
+    </step>
+
+    <branch id="false_positive_flow">
+      <name>False Positive Flow</name>
+      <steps>
+        <step>Create detailed analysis comment on GitHub issue</step>
+        <step>Include evidence: file paths, code snippets, reasoning</step>
+        <step>Tag DevOps engineer for review</step>
+        <step>Request 'false-positive' label if they agree</step>
+        <step>Explain Concert API update process</step>
+        <step>Do NOT create branch or PR</step>
+        <step>Do NOT output pr_number, pr_branch, or pr_url</step>
+        <step>Exit workflow successfully</step>
+      </steps>
+      <outputs>
+        <output>No PR outputs (pr_number, pr_branch, pr_url remain empty)</output>
+        <output>GitHub issue comment with analysis</output>
+        <output>Workflow completes without creating PR</output>
+      </outputs>
+    </branch>
+
+    <branch id="true_positive_flow">
+      <name>True Positive Flow - Package Remediation</name>
+      <steps>
+        <step>Create remediation branch: fix/cve-{CVE-ID}-{package-name}</step>
+        <step>Update package manifest files (requirements.txt, package.json, etc.)</step>
+        <step>Apply Concert's recommended package version</step>
+        <step>Consider transitive dependencies</step>
+        <step>For Python: Run pip install --dry-run to verify</step>
+        <step>Commit changes with descriptive message</step>
+        <step>Push branch to origin</step>
+        <step>Create pull request with detailed description</step>
+        <step>Link PR to GitHub issue</step>
+        <step>Output pr_number, pr_branch, pr_url</step>
+      </steps>
+      <outputs>
+        <output>pr_number: Pull request number</output>
+        <output>pr_branch: Branch name (fix/cve-...)</output>
+        <output>pr_url: Full PR URL</output>
+      </outputs>
+    </branch>
+  </workflow_decision_tree>
+
+  <false_positive_flow_details>
+    <title>False Positive Detection and Reporting</title>
+
+    <when_to_classify_as_false_positive>
+      <criterion priority="high">Package is transitive dependency never directly used</criterion>
+      <criterion priority="high">Vulnerable functions are not called anywhere in codebase</criterion>
+      <criterion priority="high">Vulnerable code paths are unreachable due to application logic</criterion>
+      <criterion priority="medium">Service is not exposed to untrusted input</criterion>
+      <criterion priority="medium">Security controls prevent exploitation</criterion>
+      <criterion priority="medium">Configuration disables vulnerable features</criterion>
+    </when_to_classify_as_false_positive>
+
+    <false_positive_actions>
+      <action_sequence>
+        <step number="1">
+          <name>Create GitHub Issue Comment</name>
+          <details>
+            Use templates from 3_github_issue_comment_templates.xml
+            Include: CVE context, code analysis, evidence, recommendation
+            Tag DevOps engineer with @username
+          </details>
+        </step>
+
+        <step number="2">
+          <name>Do NOT Create Branch or PR</name>
+          <details>
+            Skip all package remediation steps
+            Do not create fix/cve-* branch
+            Do not modify any files
+            Do not commit or push
+            Do not create pull request
+          </details>
+        </step>
+
+        <step number="3">
+          <name>Do NOT Output PR Metadata</name>
+          <details>
+            Do not set pr_number output
+            Do not set pr_branch output
+            Do not set pr_url output
+            Leave these outputs empty/undefined
+          </details>
+        </step>
+
+        <step number="4">
+          <name>Exit Workflow Successfully</name>
+          <details>
+            Complete Bob Shell execution
+            GitHub Actions will detect missing pr_number
+            Workflow will skip PR-related steps
+            Subsequent jobs will not run
+          </details>
+        </step>
+      </action_sequence>
+    </false_positive_actions>
+
+    <github_issue_comment_requirements>
+      <requirement>Include CVE ID, package name, and severity</requirement>
+      <requirement>Provide detailed analysis with evidence</requirement>
+      <requirement>Include specific file paths and line numbers</requirement>
+      <requirement>Add code snippets showing non-vulnerable usage</requirement>
+      <requirement>Explain why it's a false positive</requirement>
+      <requirement>Tag DevOps engineer for review</requirement>
+      <requirement>Request 'false-positive' label if they agree</requirement>
+      <requirement>Explain Concert API update process</requirement>
+    </github_issue_comment_requirements>
+  </false_positive_flow_details>
+
+  <true_positive_flow_details>
+    <title>True Positive Package Remediation</title>
+
+    <when_to_classify_as_true_positive>
+      <criterion priority="critical">Vulnerable functions are directly called with user input</criterion>
+      <criterion priority="critical">Service is exposed to untrusted users</criterion>
+      <criterion priority="high">No security controls prevent exploitation</criterion>
+      <criterion priority="high">Vulnerable code paths are reachable</criterion>
+      <criterion priority="medium">Package is directly imported and used</criterion>
+      <criterion priority="default">When uncertain, default to TRUE POSITIVE (safer)</criterion>
+    </when_to_classify_as_true_positive>
+
+    <true_positive_actions>
+      <action_sequence>
+        <step number="1">
+          <name>Create Remediation Branch</name>
+          <details>
+            Branch naming: fix/cve-{CVE-ID}-{package-name}
+            Example: fix/cve-2023-30861-flask
+            Create from main/master branch
+            Use git checkout -b or GitHub MCP
+          </details>
+        </step>
+
+        <step number="2">
+          <name>Update Package Manifests</name>
+          <details>
+            Python: requirements.txt, pyproject.toml, Pipfile
+            Node.js: package.json, package-lock.json
+            Java: pom.xml, build.gradle
+            Apply Concert's recommended version
+            Update related dependencies if needed
+            Add comment explaining CVE fix
+          </details>
+          <example ecosystem="python">
+            <![CDATA[
+# Before
+flask==2.2.0  # Vulnerable to CVE-2023-30861
+
+# After
+flask==2.3.3  # Fixed CVE-2023-30861 per Concert recommendation
+            ]]>
+          </example>
+        </step>
+
+        <step number="3">
+          <name>Verify Package Compatibility</name>
+          <details>
+            Python: pip install -r requirements.txt --dry-run
+            Node.js: npm install --dry-run
+            Check for transitive dependency conflicts
+            Document any compatibility concerns
+          </details>
+        </step>
+
+        <step number="4">
+          <name>Commit Changes</name>
+          <details>
+            Commit message format:
+            fix: upgrade {package} to {version} for CVE-{ID}
+            
+            - Addresses CVE-{ID} in {package}
+            - Upgraded from {old-version} to {new-version}
+            - Concert recommendation: {recommendation-details}
+            - Resolves #{issue-number}
+          </details>
+        </step>
+
+        <step number="5">
+          <name>Push Branch</name>
+          <details>
+            Push to origin remote
+            Use git push origin {branch-name}
+            Ensure branch is available for PR creation
+          </details>
+        </step>
+
+        <step number="6">
+          <name>Create Pull Request</name>
+          <details>
+            Use GitHub MCP first, fallback to gh CLI
+            Follow PR template from 6_pr_formatting_and_documentation.xml
+            Include all required sections:
+            - Security Vulnerability Remediation
+            - Vulnerability Analysis
+            - Changes Made
+            - Remediation Strategy
+            - Concert API Analysis
+            - Impact Assessment
+            - Validation Checklist
+            - References
+          </details>
+        </step>
+
+        <step number="7">
+          <name>Link PR to Issue</name>
+          <details>
+            Reference issue in PR description: Resolves #{issue-number}
+            Do NOT comment on the issue (PR link is automatic)
+            GitHub will auto-link PR to issue
+          </details>
+        </step>
+
+        <step number="8">
+          <name>Output PR Metadata</name>
+          <details>
+            Set pr_number output: {pr_number}
+            Set pr_branch output: fix/cve-{CVE-ID}-{package-name}
+            Set pr_url output: {full_pr_url}
+            These outputs trigger subsequent workflow steps
+          </details>
+        </step>
+      </action_sequence>
+    </true_positive_actions>
+
+    <package_manifest_scope>
+      <in_scope>
+        <item>requirements.txt, pyproject.toml, Pipfile (Python)</item>
+        <item>package.json, package-lock.json, yarn.lock (Node.js)</item>
+        <item>pom.xml, build.gradle (Java)</item>
+        <item>Gemfile, Gemfile.lock (Ruby)</item>
+        <item>go.mod, go.sum (Go)</item>
+        <item>Cargo.toml, Cargo.lock (Rust)</item>
+      </in_scope>
+
+      <out_of_scope>
+        <item>Application source code (*.py, *.js, *.java, etc.)</item>
+        <item>Test files (test_*.py, *.test.js, *Test.java)</item>
+        <item>Configuration files (config.yaml, settings.py)</item>
+        <item>Runtime code paths or business logic</item>
+        <item>Unit test fixes or compatibility changes</item>
+      </out_of_scope>
+
+      <handoff_criteria>
+        <criterion>If package upgrade requires code changes → Hand off to vuln-remediation-concert mode</criterion>
+        <criterion>If tests fail after upgrade → Hand off to vuln-remediation-concert mode</criterion>
+        <criterion>If breaking changes detected → Document in PR, let CI/CD handle</criterion>
+      </handoff_criteria>
+    </package_manifest_scope>
+  </true_positive_flow_details>
+
+  <concert_api_integration>
+    <title>Concert API Usage in Both Flows</title>
+
+    <research_phase>
+      <description>Both flows start with Concert API research</description>
+      <endpoints>
+        <endpoint>GET /core/api/v1/applications</endpoint>
+        <endpoint>GET /core/api/v1/applications/{id}/vulnerability_details</endpoint>
+        <endpoint>GET /core/api/v1/software_composition/recommendations</endpoint>
+      </endpoints>
+      <purpose>Understand CVE context and get remediation recommendations</purpose>
+    </research_phase>
+
+    <false_positive_update>
+      <description>False positive updates handled by separate workflow</description>
+      <trigger>DevOps engineer adds 'false-positive' label to issue</trigger>
+      <workflow>downgrade-false-positive.yml</workflow>
+      <endpoint>PATCH /concert/ingestion/api/v1/vulnerability_assessments</endpoint>
+      <payload>
+        <![CDATA[
+{
+  "assessments": [{
+    "findings_id": "...",
+    "assessment_id": "...",
+    "status": "False positive",
+    "application_id": "...",
+    "cve": "CVE-YYYY-XXXXX",
+    "comment": "..."
+  }]
+}
+        ]]>
+      </payload>
+      <note>This mode does NOT call this endpoint - separate workflow handles it</note>
+    </false_positive_update>
+
+    <true_positive_tracking>
+      <description>True positive remediation tracked via PR and issue</description>
+      <tracking>PR linked to issue, Concert tracks via issue reference</tracking>
+      <no_api_update>This mode does not update Concert status for true positives</no_api_update>
+    </true_positive_tracking>
+  </concert_api_integration>
+
+  <github_actions_integration>
+    <title>How GitHub Actions Workflow Handles Both Flows</title>
+
+    <workflow_detection>
+      <step>Bob Shell executes in devops-concert-shell-v2 mode</step>
+      <step>Workflow checks for pr_number output</step>
+      <step>If pr_number is empty → False positive detected</step>
+      <step>If pr_number exists → True positive, PR created</step>
+    </workflow_detection>
+
+    <false_positive_workflow_behavior>
+      <step>check-false-positive step detects missing pr_number</step>
+      <step>Sets false_positive_detected=true output</step>
+      <step>Adds 'false-positive-candidate' label to issue</step>
+      <step>Skips all PR-related steps (validation, comments, reviews)</step>
+      <step>Subsequent jobs don't run (approval gate, tests, fixes)</step>
+      <step>Workflow completes successfully</step>
+    </false_positive_workflow_behavior>
+
+    <true_positive_workflow_behavior>
+      <step>check-false-positive step detects pr_number exists</step>
+      <step>Sets false_positive_detected=false output</step>
+      <step>Runs PR validation step</step>
+      <step>Adds approval request comment to PR</step>
+      <step>Requests DevOps review</step>
+      <step>Adds workflow metadata labels</step>
+      <step>Subsequent jobs run (approval gate, tests, fixes)</step>
+      <step>Full workflow continues normally</step>
+    </true_positive_workflow_behavior>
+  </github_actions_integration>
+
+  <best_practices>
+    <practice priority="critical">
+      Always perform false positive analysis BEFORE any package changes
+    </practice>
+    <practice priority="critical">
+      When uncertain, default to TRUE POSITIVE (safer approach)
+    </practice>
+    <practice priority="high">
+      For false positives: Comment on issue, do NOT create PR
+    </practice>
+    <practice priority="high">
+      For true positives: Create PR with complete documentation
+    </practice>
+    <practice priority="high">
+      Never modify application code or tests in this mode
+    </practice>
+    <practice priority="medium">
+      Provide specific evidence for false positive determinations
+    </practice>
+    <practice priority="medium">
+      Follow PR template exactly for true positives
+    </practice>
+    <practice priority="medium">
+      Consider transitive dependencies when upgrading packages
+    </practice>
+  </best_practices>
+
+  <error_handling>
+    <error type="inconclusive_analysis">
+      <description>Cannot definitively determine if false positive</description>
+      <action>Default to TRUE POSITIVE and proceed with remediation</action>
+      <rationale>Better to upgrade unnecessarily than leave vulnerability</rationale>
+    </error>
+
+    <error type="search_fails">
+      <description>search_files or read_file tools fail</description>
+      <action>Document the failure and default to TRUE POSITIVE</action>
+      <rationale>Cannot perform analysis without code access</rationale>
+    </error>
+
+    <error type="concert_api_fails">
+      <description>Concert API unavailable during research</description>
+      <action>Proceed with external CVE research (NVD, GitHub Advisory)</action>
+      <rationale>Can still remediate using public CVE data</rationale>
+    </error>
+
+    <error type="github_mcp_fails">
+      <description>GitHub MCP fails for issue or PR operations</description>
+      <action>Fallback to gh CLI or authenticated REST API</action>
+      <rationale>Multiple paths ensure workflow completion</rationale>
+    </error>
+  </error_handling>
+
+  <summary>
+    <key_point>
+      DevOps Concert Shell V2 mode handles TWO distinct workflows based on false positive analysis
+    </key_point>
+    <key_point>
+      FALSE POSITIVE: Comment on issue, tag engineer, exit without PR
+    </key_point>
+    <key_point>
+      TRUE POSITIVE: Create branch, update manifests, create PR with full documentation
+    </key_point>
+    <key_point>
+      GitHub Actions workflow detects which path was taken via pr_number output
+    </key_point>
+    <key_point>
+      When uncertain, always default to TRUE POSITIVE for safety
+    </key_point>
+  </summary>
+</complete_workflow_guide>
+
+<!-- Made with Bob -->

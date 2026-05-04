@@ -1,0 +1,488 @@
+<false_positive_detection_workflow>
+  <overview>
+    Comprehensive workflow for detecting false positive CVE alerts by analyzing source code
+    to determine if vulnerable package functions are actually used in exploitable ways.
+    This prevents unnecessary package upgrades and potential breaking changes.
+  </overview>
+
+  <detection_workflow>
+    <title>Step-by-Step False Positive Detection Process</title>
+
+    <step number="1">
+      <name>Extract CVE Context from Issue</name>
+      <purpose>Understand what the vulnerability is and how it can be exploited</purpose>
+      <actions>
+        <action>Parse GitHub issue for CVE ID, package name, and version</action>
+        <action>Extract vulnerability type (RCE, XSS, SQLi, etc.)</action>
+        <action>Identify specific vulnerable functions/methods from CVE description</action>
+        <action>Note attack vector and exploitation requirements</action>
+        <action>Record CVSS score and severity level</action>
+      </actions>
+      <example>
+        CVE-2023-30861 in Flask 2.2.0:
+        - Type: Cookie parsing vulnerability
+        - Vulnerable function: werkzeug.http.parse_cookie()
+        - Attack vector: Malicious cookie headers
+        - Exploitation: Requires user-controlled cookie input
+      </example>
+    </step>
+
+    <step number="2">
+      <name>Search Codebase for Package Usage</name>
+      <purpose>Find all locations where the vulnerable package is imported or used</purpose>
+      <tools>
+        <tool name="search_files">
+          <usage>Search for import statements and package references</usage>
+          <patterns>
+            <pattern ecosystem="python">import {package}|from {package}</pattern>
+            <pattern ecosystem="nodejs">require\(['"]{package}['"]|import.*from ['"]{package}</pattern>
+            <pattern ecosystem="java">import {groupId}.{artifactId}</pattern>
+          </patterns>
+        </tool>
+      </tools>
+      <search_strategy>
+        <search>Direct imports: "import flask" or "from flask import"</search>
+        <search>Submodule imports: "from flask.sessions import"</search>
+        <search>Aliased imports: "import flask as f"</search>
+        <search>Wildcard imports: "from flask import *"</search>
+      </search_strategy>
+      <example>
+        <command>
+search_files with:
+  path: .
+  regex: (import flask|from flask)
+  file_pattern: *.py
+        </command>
+      </example>
+    </step>
+
+    <step number="3">
+      <name>Search for Vulnerable Function Calls</name>
+      <purpose>Determine if specific vulnerable functions are actually called</purpose>
+      <actions>
+        <action>Search for vulnerable function names in codebase</action>
+        <action>Check if vulnerable methods are invoked</action>
+        <action>Look for vulnerable API endpoints being used</action>
+        <action>Identify vulnerable configuration patterns</action>
+      </actions>
+      <example>
+        For CVE-2023-30861 (Flask cookie parsing):
+        <command>
+search_files with:
+  path: .
+  regex: (parse_cookie|request\.cookies|session\[)
+  file_pattern: *.py
+        </command>
+      </example>
+    </step>
+
+    <step number="4">
+      <name>Analyze Usage Context</name>
+      <purpose>Understand how the package is used and if vulnerable paths are reachable</purpose>
+      <analysis_checklist>
+        <item>Read files that import the vulnerable package</item>
+        <item>Trace data flow to vulnerable functions</item>
+        <item>Check if user input reaches vulnerable code</item>
+        <item>Evaluate if vulnerable features are enabled</item>
+        <item>Review configuration for security controls</item>
+        <item>Assess deployment context (internal vs external)</item>
+      </analysis_checklist>
+      <code_analysis_patterns>
+        <pattern name="unused_import">
+          <description>Package imported but never used</description>
+          <verdict>FALSE POSITIVE</verdict>
+          <example>
+            import flask  # Imported but no Flask code in file
+            
+            def main():
+                print("Hello")  # No Flask usage
+          </example>
+        </pattern>
+
+        <pattern name="transitive_dependency">
+          <description>Package is transitive dependency, never directly imported</description>
+          <verdict>FALSE POSITIVE (usually)</verdict>
+          <example>
+            # Application uses requests library
+            import requests
+            
+            # requests depends on urllib3, which has CVE
+            # But urllib3 is never directly imported or used
+          </example>
+        </pattern>
+
+        <pattern name="vulnerable_function_not_called">
+          <description>Package used but vulnerable function never called</description>
+          <verdict>FALSE POSITIVE</verdict>
+          <example>
+            from flask import Flask, jsonify
+            
+            app = Flask(__name__)
+            
+            @app.route('/api/data')
+            def get_data():
+                return jsonify({'data': 'value'})
+            
+            # Uses Flask but never uses request.cookies or sessions
+            # CVE-2023-30861 affects cookie parsing, not used here
+          </example>
+        </pattern>
+
+        <pattern name="unreachable_code_path">
+          <description>Vulnerable function exists but code path is unreachable</description>
+          <verdict>FALSE POSITIVE</verdict>
+          <example>
+            from flask import Flask, request
+            
+            app = Flask(__name__)
+            
+            @app.route('/internal/health')
+            def health():
+                # This endpoint is internal-only, not exposed
+                # Even if it used cookies, not exploitable
+                return 'OK'
+          </example>
+        </pattern>
+
+        <pattern name="mitigated_by_controls">
+          <description>Vulnerable function used but security controls prevent exploitation</description>
+          <verdict>FALSE POSITIVE (with documentation)</verdict>
+          <example>
+            from flask import Flask, request
+            
+            app = Flask(__name__)
+            
+            @app.before_request
+            def validate_input():
+                # WAF or input validation prevents malicious cookies
+                if not is_valid_cookie(request.cookies):
+                    abort(400)
+            
+            @app.route('/api/user')
+            def user():
+                user_id = request.cookies.get('user_id')
+                # Validated by before_request, exploitation prevented
+          </example>
+        </pattern>
+
+        <pattern name="vulnerable_function_called">
+          <description>Vulnerable function is directly called with user input</description>
+          <verdict>TRUE POSITIVE</verdict>
+          <example>
+            from flask import Flask, request
+            
+            app = Flask(__name__)
+            
+            @app.route('/api/user')
+            def user():
+                # Directly uses cookies without validation
+                user_id = request.cookies.get('user_id')
+                # Vulnerable to CVE-2023-30861
+                return f'User: {user_id}'
+          </example>
+        </pattern>
+      </code_analysis_patterns>
+    </step>
+
+    <step number="5">
+      <name>Evaluate Deployment Context</name>
+      <purpose>Assess if the deployment environment makes exploitation possible</purpose>
+      <context_factors>
+        <factor name="exposure">
+          <question>Is the service exposed to untrusted users?</question>
+          <false_positive_indicators>
+            <indicator>Internal-only service behind VPN</indicator>
+            <indicator>Localhost-only binding</indicator>
+            <indicator>Requires authentication before vulnerable code</indicator>
+            <indicator>Network segmentation prevents external access</indicator>
+          </false_positive_indicators>
+        </factor>
+
+        <factor name="input_source">
+          <question>Where does input to vulnerable function come from?</question>
+          <false_positive_indicators>
+            <indicator>Input from trusted internal systems only</indicator>
+            <indicator>Input is hardcoded or from configuration</indicator>
+            <indicator>No user-controlled input reaches vulnerable code</indicator>
+          </false_positive_indicators>
+        </factor>
+
+        <factor name="security_controls">
+          <question>Are there security controls that prevent exploitation?</question>
+          <false_positive_indicators>
+            <indicator>WAF filters malicious input</indicator>
+            <indicator>Input validation before vulnerable function</indicator>
+            <indicator>Rate limiting prevents exploitation attempts</indicator>
+            <indicator>Monitoring detects and blocks attacks</indicator>
+          </false_positive_indicators>
+        </factor>
+      </context_factors>
+    </step>
+
+    <step number="6">
+      <name>Make False Positive Determination</name>
+      <purpose>Decide if the CVE is a false positive or true positive</purpose>
+      <decision_criteria>
+        <false_positive_criteria>
+          <criterion priority="high">Package is transitive dependency never directly used</criterion>
+          <criterion priority="high">Vulnerable functions are not called anywhere in codebase</criterion>
+          <criterion priority="high">Vulnerable code paths are unreachable due to application logic</criterion>
+          <criterion priority="medium">Service is not exposed to untrusted input</criterion>
+          <criterion priority="medium">Security controls prevent exploitation</criterion>
+          <criterion priority="medium">Configuration disables vulnerable features</criterion>
+          <criterion priority="low">Deployment context makes exploitation impossible</criterion>
+        </false_positive_criteria>
+
+        <true_positive_criteria>
+          <criterion priority="critical">Vulnerable functions are directly called with user input</criterion>
+          <criterion priority="critical">Service is exposed to untrusted users</criterion>
+          <criterion priority="high">No security controls prevent exploitation</criterion>
+          <criterion priority="high">Vulnerable code paths are reachable</criterion>
+          <criterion priority="medium">Package is directly imported and used</criterion>
+        </true_positive_criteria>
+      </decision_criteria>
+
+      <decision_rules>
+        <rule>If ANY critical true positive criterion is met → TRUE POSITIVE</rule>
+        <rule>If ALL high priority false positive criteria are met → FALSE POSITIVE</rule>
+        <rule>If uncertain or mixed signals → Default to TRUE POSITIVE (safer)</rule>
+        <rule>Document reasoning clearly regardless of decision</rule>
+      </decision_rules>
+    </step>
+
+    <step number="7">
+      <name>Document Analysis</name>
+      <purpose>Create comprehensive documentation of the analysis</purpose>
+      <documentation_template>
+        <![CDATA[
+## False Positive Analysis: CVE-{CVE-ID}
+
+### Vulnerability Context
+- **CVE**: {CVE-ID}
+- **Package**: {package-name} {version}
+- **Type**: {vulnerability-type}
+- **Severity**: {severity} (CVSS {score})
+- **Vulnerable Function**: {function-name}
+- **Attack Vector**: {attack-vector}
+
+### Code Analysis
+
+#### Package Usage
+- **Direct Imports**: {count} files
+- **Import Locations**:
+  - [{file1}]({file1}:{line})
+  - [{file2}]({file2}:{line})
+
+#### Vulnerable Function Usage
+- **Function Calls Found**: {count}
+- **Call Locations**:
+  - [{file}]({file}:{line}): `{code-snippet}`
+
+#### Usage Context Analysis
+{detailed-analysis-of-how-package-is-used}
+
+### Exploitability Assessment
+
+#### Reachability
+- [ ] Vulnerable function is called
+- [ ] User input reaches vulnerable code
+- [ ] No input validation before vulnerable function
+- [ ] Vulnerable code path is reachable
+
+#### Exposure
+- [ ] Service exposed to untrusted users
+- [ ] No authentication required
+- [ ] Publicly accessible endpoint
+- [ ] External network access
+
+#### Security Controls
+- [ ] No WAF or input filtering
+- [ ] No rate limiting
+- [ ] No monitoring/detection
+- [ ] No security headers
+
+### Determination: {FALSE POSITIVE | TRUE POSITIVE}
+
+### Reasoning
+{detailed-explanation-of-why-this-is-false-or-true-positive}
+
+### Evidence
+- **File**: [{file}]({file}:{line})
+- **Code**:
+  ```{language}
+  {code-snippet}
+  ```
+- **Analysis**: {why-this-code-is-not-vulnerable}
+
+### Recommendation
+{if-false-positive-no-action-needed}
+{if-true-positive-upgrade-to-version}
+        ]]>
+      </documentation_template>
+    </step>
+
+    <step number="8">
+      <name>Take Action Based on Determination</name>
+      <purpose>Execute appropriate workflow based on false positive decision</purpose>
+      
+      <action_for_false_positive>
+        <title>If FALSE POSITIVE</title>
+        <steps>
+          <step>Create detailed comment on GitHub issue with analysis</step>
+          <step>Include all evidence and reasoning</step>
+          <step>Tag DevOps engineer for review: @{engineer}</step>
+          <step>Request they add 'false-positive' label if they agree</step>
+          <step>Explain that labeling triggers Concert API update</step>
+          <step>Do NOT create branch or PR</step>
+          <step>Exit with status: FALSE_POSITIVE_DETECTED</step>
+        </steps>
+        <comment_template>
+          <![CDATA[
+## 🔍 False Positive Analysis
+
+After analyzing the codebase, I've determined this CVE is a **false positive** for our application.
+
+### Summary
+{brief-summary-of-why-false-positive}
+
+### Detailed Analysis
+{paste-full-analysis-from-step-7}
+
+### Evidence
+- **Package Usage**: {how-package-is-used}
+- **Vulnerable Function**: {not-called-or-mitigated}
+- **Exploitability**: {why-not-exploitable}
+
+### Recommendation
+**No action required.** The vulnerable code path is not reachable in our application.
+
+---
+
+@{engineer-username} Please review this analysis. If you agree this is a false positive:
+1. Add the `false-positive` label to this issue
+2. This will trigger the `downgrade-false-positive` workflow
+3. The workflow will update Concert API to mark this as false positive
+
+**Concert API Update Details:**
+- Endpoint: `PATCH /concert/ingestion/api/v1/vulnerability_assessments`
+- Status: "False positive"
+- CVE: {CVE-ID}
+- Application: {application-name}
+
+---
+*Automated analysis by Bob DevOps Concert Shell V2*
+          ]]>
+        </comment_template>
+      </action_for_false_positive>
+
+      <action_for_true_positive>
+        <title>If TRUE POSITIVE</title>
+        <steps>
+          <step>Proceed with normal CVE remediation workflow</step>
+          <step>Create remediation branch</step>
+          <step>Update package manifests</step>
+          <step>Commit changes</step>
+          <step>Push branch</step>
+          <step>Create pull request</step>
+          <step>Exit with status: TRUE_POSITIVE</step>
+        </steps>
+      </action_for_true_positive>
+    </step>
+  </detection_workflow>
+
+  <common_false_positive_scenarios>
+    <scenario name="transitive_dependency">
+      <description>Package is a dependency of a dependency, never directly used</description>
+      <detection>No direct imports found in codebase</detection>
+      <example>
+        Application uses `requests`, which depends on `urllib3`.
+        CVE in `urllib3` but application never imports or uses `urllib3` directly.
+      </example>
+    </scenario>
+
+    <scenario name="unused_feature">
+      <description>Vulnerable feature of package is not used</description>
+      <detection>Package imported but vulnerable functions never called</detection>
+      <example>
+        Flask application uses only basic routing, never uses sessions or cookies.
+        CVE affects cookie parsing, but application doesn't use cookies.
+      </example>
+    </scenario>
+
+    <scenario name="internal_only">
+      <description>Service is internal-only, not exposed to untrusted users</description>
+      <detection>Deployment configuration shows internal-only access</detection>
+      <example>
+        Service runs on localhost or behind VPN, requires authentication.
+        Even if vulnerable code exists, not exploitable from external network.
+      </example>
+    </scenario>
+
+    <scenario name="input_validation">
+      <description>Input validation prevents exploitation</description>
+      <detection>Security controls validate input before vulnerable code</detection>
+      <example>
+        WAF or middleware validates all input before reaching vulnerable function.
+        Malicious input is blocked before it can trigger vulnerability.
+      </example>
+    </scenario>
+
+    <scenario name="disabled_feature">
+      <description>Vulnerable feature is disabled in configuration</description>
+      <detection>Configuration files show feature is disabled</detection>
+      <example>
+        Vulnerable XML parsing feature is disabled in configuration.
+        Even though package has CVE, feature is not enabled.
+      </example>
+    </scenario>
+  </common_false_positive_scenarios>
+
+  <best_practices>
+    <practice priority="critical">
+      Always perform false positive analysis before any package changes
+    </practice>
+    <practice priority="critical">
+      Be thorough - check all files, not just obvious ones
+    </practice>
+    <practice priority="high">
+      Document all findings with specific file paths and line numbers
+    </practice>
+    <practice priority="high">
+      Include code snippets as evidence in analysis
+    </practice>
+    <practice priority="high">
+      When uncertain, default to TRUE POSITIVE (safer approach)
+    </practice>
+    <practice priority="medium">
+      Consider deployment context and security controls
+    </practice>
+    <practice priority="medium">
+      Tag appropriate engineer for review of false positive determination
+    </practice>
+    <practice priority="low">
+      Keep analysis concise but comprehensive
+    </practice>
+  </best_practices>
+
+  <error_handling>
+    <error type="inconclusive_analysis">
+      <description>Cannot definitively determine if false positive</description>
+      <action>Default to TRUE POSITIVE and proceed with remediation</action>
+      <rationale>Better to upgrade unnecessarily than leave vulnerability</rationale>
+    </error>
+
+    <error type="search_fails">
+      <description>search_files or read_file tools fail</description>
+      <action>Document the failure and default to TRUE POSITIVE</action>
+      <rationale>Cannot perform analysis without code access</rationale>
+    </error>
+
+    <error type="complex_codebase">
+      <description>Codebase too complex to analyze fully</description>
+      <action>Perform best-effort analysis, document limitations, default to TRUE POSITIVE if uncertain</action>
+      <rationale>Complexity increases risk of missing vulnerable code paths</rationale>
+    </error>
+  </error_handling>
+</false_positive_detection_workflow>
+
+<!-- Made with Bob -->

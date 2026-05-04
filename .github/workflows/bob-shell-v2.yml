@@ -47,6 +47,7 @@ jobs:
       pr_number: ${{ steps.bob-devops.outputs.pr_number }}
       pr_branch: ${{ steps.bob-devops.outputs.pr_branch }}
       issue_number: ${{ steps.get-issue.outputs.issue_number }}
+      false_positive_detected: ${{ steps.check-false-positive.outputs.false_positive_detected }}
     
     steps:
       - name: Checkout repository
@@ -84,16 +85,16 @@ jobs:
           EOF
           echo "✅ Concert API credentials configured"
       
-      - name: Run Bob Shell - DevOps Concert Mode
+      - name: Run Bob Shell - DevOps Concert Mode V2 (with False Positive Detection)
         id: bob-devops
         uses: ./.github/actions/bob-shell
         with:
           bobshell_api_key: ${{ secrets.BOBSHELL_API_KEY }}
           bobshell_debug: true
           mcp: ${{ secrets.BOBSHELL_MCP_CONFIG }}
-          chat_mode: devops-concert-shell
+          chat_mode: devops-concert-shell-v2
           prompt: |
-            Process GitHub issue #${{ steps.get-issue.outputs.issue_number }}.
+            Process GitHub issue #${{ steps.get-issue.outputs.issue_number }} with false positive detection.
             
             Concert API credentials are available in the .env file in the repository root.
             
@@ -122,13 +123,29 @@ jobs:
                
                e. Validate consistency between Concert and external source (NVD preferred)
                f. Select final remediation version based on Concert + NVD validation
-               g. Document which sources were used and why
             
-            3. Apply the package fix to the manifest files (requirements.txt, package.json, etc.)
+            3. FALSE POSITIVE DETECTION (NEW):
+               a. Analyze source code to determine if CVE is a false positive
+               b. Use search_files to find package imports and vulnerable function calls
+               c. Read relevant files to understand usage patterns
+               d. Assess if vulnerable code paths are reachable
+               e. Consider deployment context and security controls
+               f. Make determination: FALSE POSITIVE or TRUE POSITIVE
             
-            4. IMPORTANT: Consider transitive dependencies when upgrading packages
+            4. IF FALSE POSITIVE:
+               a. Create detailed comment on GitHub issue with analysis
+               b. Include evidence: file paths, code snippets, reasoning
+               c. Tag DevOps engineer for review
+               d. Request they add 'false-positive' label if they agree
+               e. Explain that labeling triggers Concert API update
+               f. Do NOT create branch or PR
+               g. Do NOT output pr_number, pr_branch, or pr_url
+               h. Exit workflow - Bob has commented on the issue
             
-            5. For Python projects: Run 'pip install -r requirements.txt --dry-run' to verify all requirements can be met
+            5. IF TRUE POSITIVE - Apply the package fix:
+               a. Apply the package fix to the manifest files (requirements.txt, package.json, etc.)
+               b. IMPORTANT: Consider transitive dependencies when upgrading packages
+               c. For Python projects: Run 'pip install -r requirements.txt --dry-run' to verify all requirements can be met
             
             6. Create a branch following the naming convention: fix/cve-{CVE-ID}-{package-name}
             
@@ -149,15 +166,50 @@ jobs:
                  * 📚 References (NVD URL, GitHub Advisory URL, Package Changelog, CWE URL, Concert Issue)
             
             CRITICAL REQUIREMENTS:
+            - You MUST perform false positive detection before any package changes
             - You MUST query NVD API or GitHub Advisory API for every CVE - this is non-negotiable
             - You MUST follow the PR template format from 6_pr_formatting_and_documentation.xml exactly
             - Only update package manifest files. Do NOT modify application code or tests
             - If sources disagree, document the discrepancy and choose the safest version
+            - If uncertain about false positive, default to TRUE POSITIVE (safer)
 
-            10. Link the PR to GitHub issue #${{ steps.get-issue.outputs.issue_number }} without commenting on issue
+            10. Link the PR to GitHub issue #${{ steps.get-issue.outputs.issue_number }} without commenting on issue (TRUE POSITIVE only)
+            
+            IMPORTANT OUTPUT REQUIREMENTS:
+            - For FALSE POSITIVE: Do NOT set pr_number, pr_branch, or pr_url outputs. Just comment on the issue and exit.
+            - For TRUE POSITIVE: Set pr_number, pr_branch, and pr_url outputs as usual after creating the PR.
           settings: ${{ vars.BOBSHELL_SETTINGS }}
       
+      - name: Check for False Positive Detection
+        id: check-false-positive
+        run: |
+          # Check if Bob detected a false positive (no PR created)
+          PR_NUMBER="${{ steps.bob-devops.outputs.pr_number }}"
+          if [[ -z "$PR_NUMBER" || "$PR_NUMBER" == "null" ]]; then
+            echo "false_positive_detected=true" >> $GITHUB_OUTPUT
+            echo "⚠️ False positive detected - no PR was created"
+          else
+            echo "false_positive_detected=false" >> $GITHUB_OUTPUT
+            echo "✅ True positive - PR #${PR_NUMBER} was created"
+          fi
+      
+      - name: Add False Positive Label
+        if: steps.check-false-positive.outputs.false_positive_detected == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issueNumber = Number(`${{ steps.get-issue.outputs.issue_number }}`.trim());
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              labels: ['false-positive-candidate', 'awaiting-devops-review']
+            });
+            core.info(`Added false-positive-candidate label to issue #${issueNumber}`);
+      
       - name: Validate PR Creation
+        if: steps.check-false-positive.outputs.false_positive_detected == 'false'
         id: validate-pr
         uses: actions/github-script@v7
         with:
@@ -167,28 +219,19 @@ jobs:
             const prBranch = `${{ steps.bob-devops.outputs.pr_branch }}`.trim();
             const prUrl = `${{ steps.bob-devops.outputs.pr_url }}`.trim();
 
-            if (!prNumber) {
-              core.setFailed(
-                `Missing Bob Shell PR output. pr_number='${prNumber}', pr_branch='${prBranch}', pr_url='${prUrl}'`
-              );
-              return;
-            }
-
+            // Verify PR exists via GitHub API
             const { data: pr } = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: Number(prNumber),
             });
 
-            core.info(`Validated PR #${pr.number}`);
-            if (prBranch) {
-              core.info(`PR Branch: ${prBranch}`);
-            }
-            if (prUrl) {
-              core.info(`PR URL: ${prUrl}`);
-            }
+            core.info(`✅ Validated PR #${pr.number}`);
+            core.info(`   Branch: ${prBranch || pr.head.ref}`);
+            core.info(`   URL: ${prUrl || pr.html_url}`);
       
       - name: Add Approval Request Comment
+        if: steps.check-false-positive.outputs.false_positive_detected == 'false'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -217,6 +260,7 @@ jobs:
             });
       
       - name: Request DevOps Review
+        if: steps.check-false-positive.outputs.false_positive_detected == 'false'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -230,6 +274,7 @@ jobs:
             });
       
       - name: Add workflow metadata label
+        if: steps.check-false-positive.outputs.false_positive_detected == 'false'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -250,7 +295,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: devops-cve-research
     if: |
-      (needs.devops-cve-research.result == 'success') ||
+      (needs.devops-cve-research.result == 'success' &&
+       needs.devops-cve-research.outputs.false_positive_detected != 'true') ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_to_step == '2')
     environment:
       name: devops-approval

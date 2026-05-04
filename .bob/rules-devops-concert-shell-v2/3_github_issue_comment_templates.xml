@@ -1,0 +1,533 @@
+<github_issue_comment_templates>
+  <overview>
+    Templates for GitHub issue comments when Bob detects a false positive CVE.
+    These comments provide detailed analysis and guide the DevOps engineer through
+    the confirmation process.
+  </overview>
+
+  <false_positive_comment_template>
+    <title>Standard False Positive Analysis Comment</title>
+    <template>
+      <![CDATA[
+## 🔍 False Positive Analysis
+
+After analyzing the codebase, I've determined this CVE is a **false positive** for our application.
+
+### 📋 Summary
+
+**CVE**: {CVE-ID}  
+**Package**: `{package-name}` {current-version}  
+**Severity**: {severity} (CVSS {score})  
+**Determination**: **FALSE POSITIVE**
+
+**Reason**: {one-sentence-summary}
+
+---
+
+### 🔬 Detailed Analysis
+
+#### Vulnerability Context
+- **Type**: {vulnerability-type}
+- **Vulnerable Function**: `{function-name}`
+- **Attack Vector**: {attack-vector-description}
+- **Exploitation Requirements**: {what-attacker-needs}
+
+#### Code Analysis
+
+**Package Usage in Codebase:**
+{usage-analysis}
+
+**Vulnerable Function Calls:**
+{function-call-analysis}
+
+**Exploitability Assessment:**
+{exploitability-analysis}
+
+---
+
+### 📊 Evidence
+
+#### Files Analyzed
+{list-of-files-with-links}
+
+#### Key Findings
+{bullet-points-of-key-findings}
+
+#### Code Examples
+{code-snippets-showing-non-vulnerable-usage}
+
+---
+
+### ✅ Recommendation
+
+**No action required.** {explanation-of-why-no-action-needed}
+
+---
+
+### 🎯 Next Steps
+
+@{engineer-username} Please review this analysis. If you agree this is a false positive:
+
+1. **Add the `false-positive` label** to this issue
+2. This will trigger the `downgrade-false-positive` GitHub Actions workflow
+3. The workflow will update Concert API to mark this CVE as false positive
+
+**Concert API Update Details:**
+- **Endpoint**: `PATCH /concert/ingestion/api/v1/vulnerability_assessments`
+- **Status**: "False positive"
+- **CVE**: {CVE-ID}
+- **Application**: {application-name}
+
+If you disagree with this analysis, please comment with your concerns and I can re-analyze.
+
+---
+
+*🤖 Automated analysis by Bob DevOps Concert Shell V2*
+      ]]>
+    </template>
+
+    <usage_instructions>
+      <instruction>Replace all {placeholders} with actual values</instruction>
+      <instruction>Include specific file paths and line numbers in evidence</instruction>
+      <instruction>Add code snippets to support your analysis</instruction>
+      <instruction>Tag the appropriate DevOps engineer</instruction>
+      <instruction>Keep analysis clear and concise</instruction>
+    </usage_instructions>
+  </false_positive_comment_template>
+
+  <scenario_specific_templates>
+    <template name="transitive_dependency">
+      <title>False Positive: Transitive Dependency</title>
+      <content>
+        <![CDATA[
+## 🔍 False Positive Analysis: Transitive Dependency
+
+### 📋 Summary
+
+**CVE**: {CVE-ID}  
+**Package**: `{package-name}` {version}  
+**Determination**: **FALSE POSITIVE** - Transitive dependency not directly used
+
+### 🔬 Analysis
+
+This package is a **transitive dependency** (dependency of a dependency) and is never directly imported or used in our application code.
+
+#### Dependency Chain
+```
+{direct-dependency} → {intermediate-dependency} → {vulnerable-package}
+```
+
+#### Code Search Results
+- ✅ **Direct imports**: 0 found
+- ✅ **Indirect usage**: 0 found
+- ✅ **Configuration references**: 0 found
+
+**Search performed:**
+```bash
+search_files:
+  regex: (import {package}|from {package}|require.*{package})
+  path: .
+  file_pattern: *.{ext}
+```
+
+**Result**: No matches found in any application code.
+
+### ✅ Recommendation
+
+**No action required.** The vulnerable package is present in our dependency tree but is never used by our application. The vulnerability cannot be exploited.
+
+### 🎯 Next Steps
+
+@{engineer} If you agree, please add the `false-positive` label to trigger Concert API update.
+        ]]>
+      </content>
+    </template>
+
+    <template name="unused_feature">
+      <title>False Positive: Vulnerable Feature Not Used</title>
+      <content>
+        <![CDATA[
+## 🔍 False Positive Analysis: Vulnerable Feature Not Used
+
+### 📋 Summary
+
+**CVE**: {CVE-ID}  
+**Package**: `{package-name}` {version}  
+**Vulnerable Feature**: `{feature-name}`  
+**Determination**: **FALSE POSITIVE** - Vulnerable feature not used
+
+### 🔬 Analysis
+
+While our application uses `{package-name}`, it does **not use the vulnerable feature** affected by this CVE.
+
+#### Package Usage
+**Files using {package-name}:**
+{list-of-files}
+
+**Features used:**
+{list-of-features-used}
+
+**Vulnerable feature (`{vulnerable-feature}`):**
+- ❌ Not imported
+- ❌ Not called
+- ❌ Not configured
+
+#### Code Evidence
+
+**Example from [{file}]({file}:{line}):**
+```{language}
+{code-snippet-showing-safe-usage}
+```
+
+**Analysis**: This code uses {package-name} for {purpose}, but never calls the vulnerable `{vulnerable-function}` function.
+
+### ✅ Recommendation
+
+**No action required.** The vulnerable code path is not reachable in our application.
+
+### 🎯 Next Steps
+
+@{engineer} If you agree, please add the `false-positive` label to trigger Concert API update.
+        ]]>
+      </content>
+    </template>
+
+    <template name="mitigated_by_controls">
+      <title>False Positive: Mitigated by Security Controls</title>
+      <content>
+        <![CDATA[
+## 🔍 False Positive Analysis: Mitigated by Security Controls
+
+### 📋 Summary
+
+**CVE**: {CVE-ID}  
+**Package**: `{package-name}` {version}  
+**Determination**: **FALSE POSITIVE** - Exploitation prevented by security controls
+
+### 🔬 Analysis
+
+While the vulnerable code path exists, **security controls prevent exploitation**.
+
+#### Vulnerability Details
+- **Type**: {vulnerability-type}
+- **Attack Vector**: {attack-vector}
+- **Exploitation Requirement**: {requirement}
+
+#### Security Controls in Place
+
+**1. {Control-Name}**
+- **Location**: [{file}]({file}:{line})
+- **Function**: {what-it-does}
+- **Effectiveness**: Blocks {attack-type} before reaching vulnerable code
+
+**Code:**
+```{language}
+{security-control-code}
+```
+
+**2. {Additional-Control}**
+{additional-control-details}
+
+#### Attack Path Analysis
+```
+User Input → Security Control → Validation → Application Code
+                    ↓
+              Blocks malicious input
+```
+
+The vulnerable function is only reachable after input passes through security controls that prevent exploitation.
+
+### ✅ Recommendation
+
+**No action required.** Security controls effectively prevent exploitation of this vulnerability.
+
+**Note**: Ensure security controls remain in place. If controls are removed, this CVE should be re-evaluated.
+
+### 🎯 Next Steps
+
+@{engineer} If you agree, please add the `false-positive` label to trigger Concert API update.
+        ]]>
+      </content>
+    </template>
+
+    <template name="internal_only_service">
+      <title>False Positive: Internal-Only Service</title>
+      <content>
+        <![CDATA[
+## 🔍 False Positive Analysis: Internal-Only Service
+
+### 📋 Summary
+
+**CVE**: {CVE-ID}  
+**Package**: `{package-name}` {version}  
+**Determination**: **FALSE POSITIVE** - Service not exposed to untrusted users
+
+### 🔬 Analysis
+
+This service is **internal-only** and not exposed to untrusted users, making exploitation impossible.
+
+#### Deployment Context
+- **Network**: {internal-network-description}
+- **Access**: {access-control-description}
+- **Exposure**: {exposure-level}
+
+#### Security Boundaries
+```
+Internet → Firewall → VPN → Internal Network → This Service
+           ↓
+      Blocks external access
+```
+
+#### Configuration Evidence
+
+**From [{config-file}]({config-file}):**
+```{language}
+{config-showing-internal-binding}
+```
+
+**Analysis**: Service binds to {internal-address}, accessible only from {trusted-network}.
+
+#### Attack Feasibility
+- ❌ No external network access
+- ❌ Requires VPN authentication
+- ❌ Internal network only
+- ❌ No untrusted user input
+
+### ✅ Recommendation
+
+**No action required.** The deployment context prevents exploitation by untrusted actors.
+
+**Note**: If deployment changes to expose this service externally, this CVE should be re-evaluated.
+
+### 🎯 Next Steps
+
+@{engineer} If you agree, please add the `false-positive` label to trigger Concert API update.
+        ]]>
+      </content>
+    </template>
+
+    <template name="configuration_disabled">
+      <title>False Positive: Vulnerable Feature Disabled</title>
+      <content>
+        <![CDATA[
+## 🔍 False Positive Analysis: Vulnerable Feature Disabled
+
+### 📋 Summary
+
+**CVE**: {CVE-ID}  
+**Package**: `{package-name}` {version}  
+**Vulnerable Feature**: `{feature-name}`  
+**Determination**: **FALSE POSITIVE** - Feature disabled in configuration
+
+### 🔬 Analysis
+
+The vulnerable feature is **explicitly disabled** in our application configuration.
+
+#### Configuration Evidence
+
+**From [{config-file}]({config-file}:{line}):**
+```{language}
+{config-snippet-showing-disabled-feature}
+```
+
+**Analysis**: {feature-name} is set to `{disabled-value}`, preventing the vulnerable code path from being executed.
+
+#### Feature Status
+- ✅ Feature disabled in configuration
+- ✅ Vulnerable code path unreachable
+- ✅ No way to enable without configuration change
+
+#### Code Path Analysis
+```
+Application Start → Load Config → Check {feature-name}
+                                        ↓
+                                   Disabled → Skip vulnerable code
+```
+
+### ✅ Recommendation
+
+**No action required.** The vulnerable feature is disabled and cannot be exploited.
+
+**Note**: If configuration changes to enable this feature, this CVE should be re-evaluated.
+
+### 🎯 Next Steps
+
+@{engineer} If you agree, please add the `false-positive` label to trigger Concert API update.
+        ]]>
+      </content>
+    </template>
+  </scenario_specific_templates>
+
+  <comment_formatting_guidelines>
+    <guideline priority="high">
+      Use clear section headers with emojis for visual organization
+    </guideline>
+    <guideline priority="high">
+      Include specific file paths as clickable links: [{file}]({file}:{line})
+    </guideline>
+    <guideline priority="high">
+      Provide code snippets with proper syntax highlighting
+    </guideline>
+    <guideline priority="medium">
+      Use checkboxes (✅/❌) for clear yes/no indicators
+    </guideline>
+    <guideline priority="medium">
+      Include diagrams or flow charts for complex scenarios
+    </guideline>
+    <guideline priority="medium">
+      Tag the appropriate engineer with @username
+    </guideline>
+    <guideline priority="low">
+      Keep total comment length under 2000 characters when possible
+    </guideline>
+    <guideline priority="low">
+      Use collapsible sections for very detailed analysis
+    </guideline>
+  </comment_formatting_guidelines>
+
+  <best_practices>
+    <practice priority="critical">
+      Always provide specific evidence with file paths and line numbers
+    </practice>
+    <practice priority="critical">
+      Explain WHY it's a false positive, not just THAT it is
+    </practice>
+    <practice priority="high">
+      Include code snippets to support your analysis
+    </practice>
+    <practice priority="high">
+      Make it easy for engineer to confirm by adding label
+    </practice>
+    <practice priority="medium">
+      Provide context about what would make it a true positive
+    </practice>
+    <practice priority="medium">
+      Note any conditions that could change the determination
+    </practice>
+    <practice priority="low">
+      Use professional but friendly tone
+    </practice>
+  </best_practices>
+
+  <example_complete_comment>
+    <title>Complete Example: Flask Cookie Parsing CVE</title>
+    <comment>
+      <![CDATA[
+## 🔍 False Positive Analysis
+
+After analyzing the codebase, I've determined this CVE is a **false positive** for our application.
+
+### 📋 Summary
+
+**CVE**: CVE-2023-30861  
+**Package**: `flask` 2.2.0  
+**Severity**: HIGH (CVSS 7.5)  
+**Determination**: **FALSE POSITIVE**
+
+**Reason**: Application uses Flask but never uses sessions or cookies, making the cookie parsing vulnerability unexploitable.
+
+---
+
+### 🔬 Detailed Analysis
+
+#### Vulnerability Context
+- **Type**: Cookie parsing vulnerability
+- **Vulnerable Function**: `werkzeug.http.parse_cookie()`
+- **Attack Vector**: Malicious cookie headers can cause denial of service
+- **Exploitation Requirements**: Application must process user-supplied cookies
+
+#### Code Analysis
+
+**Package Usage in Codebase:**
+
+Flask is imported in 2 files:
+- [`app/main.py`](app/main.py:1)
+- [`app/api.py`](app/api.py:1)
+
+**Search performed:**
+```bash
+search_files:
+  regex: (request\.cookies|session\[|parse_cookie)
+  path: .
+  file_pattern: *.py
+```
+
+**Result**: 0 matches found
+
+**Vulnerable Function Calls:**
+
+No calls to cookie-related functions found:
+- ❌ `request.cookies` - Not used
+- ❌ `session[]` - Not used
+- ❌ `parse_cookie()` - Not used
+
+**Exploitability Assessment:**
+
+The application uses Flask only for basic routing and JSON responses. It does not:
+- Process cookies
+- Use sessions
+- Parse cookie headers
+- Accept cookie-based authentication
+
+---
+
+### 📊 Evidence
+
+#### Files Analyzed
+- [`app/main.py`](app/main.py) - Flask app initialization
+- [`app/api.py`](app/api.py) - API endpoints
+
+#### Key Findings
+- ✅ Flask imported but only for routing
+- ✅ No cookie or session usage
+- ✅ All endpoints return JSON only
+- ✅ No authentication using cookies
+
+#### Code Examples
+
+**From [`app/api.py`](app/api.py:10-15):**
+```python
+from flask import Flask, jsonify
+
+app = Flask(__name__)
+
+@app.route('/api/data')
+def get_data():
+    return jsonify({'data': 'value'})
+```
+
+**Analysis**: This code uses Flask for basic routing and JSON responses. No cookies or sessions are used, so the cookie parsing vulnerability cannot be exploited.
+
+---
+
+### ✅ Recommendation
+
+**No action required.** The vulnerable cookie parsing code path is not reachable in our application because we don't use cookies or sessions.
+
+---
+
+### 🎯 Next Steps
+
+@devops-engineer Please review this analysis. If you agree this is a false positive:
+
+1. **Add the `false-positive` label** to this issue
+2. This will trigger the `downgrade-false-positive` GitHub Actions workflow
+3. The workflow will update Concert API to mark this CVE as false positive
+
+**Concert API Update Details:**
+- **Endpoint**: `PATCH /concert/ingestion/api/v1/vulnerability_assessments`
+- **Status**: "False positive"
+- **CVE**: CVE-2023-30861
+- **Application**: my-flask-app
+
+If you disagree with this analysis, please comment with your concerns and I can re-analyze.
+
+---
+
+*🤖 Automated analysis by Bob DevOps Concert Shell V2*
+      ]]>
+    </comment>
+  </example_complete_comment>
+</github_issue_comment_templates>
+
+<!-- Made with Bob -->

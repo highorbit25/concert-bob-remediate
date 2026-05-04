@@ -1,0 +1,391 @@
+<mode_overview>
+  <title>DevOps Concert Shell V2 Mode - Complete Guide</title>
+  
+  <introduction>
+    The DevOps Concert Shell V2 mode is an enhanced version of the DevOps Concert Shell mode
+    that adds intelligent false positive detection before proceeding with CVE remediation.
+    This prevents unnecessary package upgrades and potential breaking changes by analyzing
+    source code to determine if vulnerable package functions are actually used in exploitable ways.
+  </introduction>
+
+  <key_features>
+    <feature name="false_positive_detection">
+      <description>Analyzes source code to detect false positive CVE alerts</description>
+      <benefit>Prevents unnecessary package upgrades and breaking changes</benefit>
+      <implementation>Uses search_files and read_file to analyze package usage</implementation>
+    </feature>
+
+    <feature name="intelligent_workflow">
+      <description>Only creates PRs for true positive CVEs</description>
+      <benefit>Reduces DevOps workload and CI/CD noise</benefit>
+      <implementation>Comments on issue for false positives, creates PR for true positives</implementation>
+    </feature>
+
+    <feature name="concert_integration">
+      <description>Integrates with Concert API for false positive reporting</description>
+      <benefit>Keeps Concert dashboard accurate and up-to-date</benefit>
+      <implementation>GitHub Actions workflow updates Concert after engineer confirmation</implementation>
+    </feature>
+
+    <feature name="detailed_analysis">
+      <description>Provides comprehensive analysis documentation</description>
+      <benefit>Engineers can make informed decisions</benefit>
+      <implementation>Detailed GitHub issue comments with evidence and reasoning</implementation>
+    </feature>
+  </key_features>
+
+  <workflow_comparison>
+    <title>DevOps Concert Shell vs DevOps Concert Shell V2</title>
+
+    <original_workflow name="devops-concert-shell">
+      <steps>
+        <step>1. Fetch GitHub issue</step>
+        <step>2. Research CVE in Concert and external sources</step>
+        <step>3. Create remediation branch</step>
+        <step>4. Update package manifests</step>
+        <step>5. Create pull request</step>
+      </steps>
+      <limitation>Always creates PR, even for false positives</limitation>
+      <limitation>No source code analysis</limitation>
+      <limitation>May cause unnecessary breaking changes</limitation>
+    </original_workflow>
+
+    <enhanced_workflow name="devops-concert-shell-v2">
+      <steps>
+        <step>1. Fetch GitHub issue</step>
+        <step>2. Research CVE in Concert and external sources</step>
+        <step>3. **NEW: Analyze source code for false positive detection**</step>
+        <step>4a. If FALSE POSITIVE: Comment on issue, tag engineer, exit</step>
+        <step>4b. If TRUE POSITIVE: Create remediation branch</step>
+        <step>5. Update package manifests (true positive only)</step>
+        <step>6. Create pull request (true positive only)</step>
+      </steps>
+      <advantage>Prevents unnecessary PRs for false positives</advantage>
+      <advantage>Analyzes actual code usage</advantage>
+      <advantage>Reduces breaking changes and CI/CD noise</advantage>
+    </enhanced_workflow>
+  </workflow_comparison>
+
+  <false_positive_detection_process>
+    <title>How False Positive Detection Works</title>
+
+    <step number="1">
+      <name>Extract CVE Context</name>
+      <actions>
+        <action>Parse GitHub issue for CVE details</action>
+        <action>Identify vulnerable functions/methods</action>
+        <action>Understand attack vector and exploitation requirements</action>
+      </actions>
+    </step>
+
+    <step number="2">
+      <name>Search Codebase</name>
+      <actions>
+        <action>Use search_files to find package imports</action>
+        <action>Search for vulnerable function calls</action>
+        <action>Identify all files using the package</action>
+      </actions>
+    </step>
+
+    <step number="3">
+      <name>Analyze Usage</name>
+      <actions>
+        <action>Read relevant source files</action>
+        <action>Trace data flow to vulnerable functions</action>
+        <action>Check if user input reaches vulnerable code</action>
+        <action>Evaluate security controls</action>
+      </actions>
+    </step>
+
+    <step number="4">
+      <name>Assess Exploitability</name>
+      <actions>
+        <action>Determine if vulnerable code paths are reachable</action>
+        <action>Check deployment context (internal vs external)</action>
+        <action>Evaluate security controls and mitigations</action>
+      </actions>
+    </step>
+
+    <step number="5">
+      <name>Make Determination</name>
+      <criteria>
+        <false_positive>
+          <criterion>Package is transitive dependency never used</criterion>
+          <criterion>Vulnerable functions not called</criterion>
+          <criterion>Vulnerable code paths unreachable</criterion>
+          <criterion>Security controls prevent exploitation</criterion>
+          <criterion>Service not exposed to untrusted users</criterion>
+        </false_positive>
+        <true_positive>
+          <criterion>Vulnerable functions directly called</criterion>
+          <criterion>Service exposed to untrusted users</criterion>
+          <criterion>No security controls prevent exploitation</criterion>
+        </true_positive>
+      </criteria>
+    </step>
+
+    <step number="6">
+      <name>Take Action</name>
+      <false_positive_action>
+        <action>Create detailed comment on GitHub issue</action>
+        <action>Include analysis, evidence, and reasoning</action>
+        <action>Tag DevOps engineer for review</action>
+        <action>Request 'false-positive' label if they agree</action>
+        <action>Exit without creating PR</action>
+      </false_positive_action>
+      <true_positive_action>
+        <action>Proceed with normal CVE remediation</action>
+        <action>Create branch, update manifests, create PR</action>
+      </true_positive_action>
+    </step>
+  </false_positive_detection_process>
+
+  <concert_api_integration>
+    <title>Concert API False Positive Workflow</title>
+
+    <step number="1">
+      <actor>Bob (devops-concert-shell-v2)</actor>
+      <action>Detects false positive and comments on issue</action>
+    </step>
+
+    <step number="2">
+      <actor>DevOps Engineer</actor>
+      <action>Reviews analysis and adds 'false-positive' label</action>
+    </step>
+
+    <step number="3">
+      <actor>GitHub Actions (downgrade-false-positive workflow)</actor>
+      <action>Triggered by label, calls Concert API</action>
+      <api_call>
+        <endpoint>PATCH /concert/ingestion/api/v1/vulnerability_assessments</endpoint>
+        <payload>
+          {
+            "assessments": [{
+              "findings_id": "...",
+              "assessment_id": "...",
+              "status": "False positive",
+              "application_id": "...",
+              "cve": "CVE-YYYY-XXXXX",
+              "comment": "..."
+            }]
+          }
+        </payload>
+      </api_call>
+    </step>
+
+    <step number="4">
+      <actor>Concert</actor>
+      <action>Updates vulnerability assessment status</action>
+      <result>CVE marked as false positive in Concert dashboard</result>
+    </step>
+  </concert_api_integration>
+
+  <file_structure>
+    <title>Mode Files and Documentation</title>
+
+    <mode_configuration>
+      <file>.bob/custom_modes.yaml</file>
+      <section>devops-concert-shell-v2</section>
+      <description>Main mode configuration with roleDefinition and whenToUse</description>
+    </mode_configuration>
+
+    <rule_files>
+      <file>
+        <path>.bob/rules-devops-concert-shell-v2/0_mode_overview.xml</path>
+        <description>This file - complete mode overview and guide</description>
+      </file>
+      <file>
+        <path>.bob/rules-devops-concert-shell-v2/1_false_positive_detection_workflow.xml</path>
+        <description>Detailed false positive detection workflow and methodology</description>
+      </file>
+      <file>
+        <path>.bob/rules-devops-concert-shell-v2/2_complete_workflow_guide.xml</path>
+        <description>Complete workflow covering both false positive and true positive flows</description>
+      </file>
+      <file>
+        <path>.bob/rules-devops-concert-shell-v2/3_github_issue_comment_templates.xml</path>
+        <description>Templates for GitHub issue comments</description>
+      </file>
+    </rule_files>
+  </file_structure>
+
+  <usage_examples>
+    <example name="github_actions_workflow">
+      <title>Using in GitHub Actions</title>
+      <workflow_yaml>
+        <![CDATA[
+name: CVE Remediation with False Positive Detection
+
+on:
+  issues:
+    types: [opened, labeled]
+
+jobs:
+  remediate-cve:
+    if: contains(github.event.issue.labels.*.name, 'cve-remediation')
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Run Bob Shell V2
+        uses: ./.github/actions/bob-shell
+        with:
+          bobshell_api_key: ${{ secrets.BOBSHELL_API_KEY }}
+          chat_mode: devops-concert-shell-v2
+          prompt: |
+            Process GitHub issue #${{ github.event.issue.number }}.
+            
+            Analyze the CVE for false positive detection before proceeding.
+            
+            If false positive: Comment on issue with analysis.
+            If true positive: Create remediation PR.
+        ]]>
+      </workflow_yaml>
+    </example>
+
+    <example name="manual_invocation">
+      <title>Manual Invocation in Bob IDE</title>
+      <command>
+        Switch to devops-concert-shell-v2 mode and run:
+        "Process GitHub issue #123 with false positive detection"
+      </command>
+    </example>
+  </usage_examples>
+
+  <common_false_positive_scenarios>
+    <scenario name="transitive_dependency">
+      <description>Package is dependency of dependency, never directly used</description>
+      <detection>No direct imports found in codebase</detection>
+      <example>App uses requests → urllib3 (CVE in urllib3 but never directly used)</example>
+    </scenario>
+
+    <scenario name="unused_feature">
+      <description>Package used but vulnerable feature not used</description>
+      <detection>Package imported but vulnerable functions never called</detection>
+      <example>Flask app uses routing but not sessions (CVE in session handling)</example>
+    </scenario>
+
+    <scenario name="internal_only">
+      <description>Service internal-only, not exposed to untrusted users</description>
+      <detection>Deployment config shows internal-only access</detection>
+      <example>Service on localhost/VPN, even if vulnerable code exists</example>
+    </scenario>
+
+    <scenario name="mitigated">
+      <description>Security controls prevent exploitation</description>
+      <detection>WAF or validation before vulnerable code</detection>
+      <example>Input validation blocks malicious input before vulnerable function</example>
+    </scenario>
+
+    <scenario name="disabled_feature">
+      <description>Vulnerable feature disabled in configuration</description>
+      <detection>Config files show feature disabled</detection>
+      <example>XML parsing disabled even though library has CVE</example>
+    </scenario>
+  </common_false_positive_scenarios>
+
+  <best_practices>
+    <practice priority="critical">
+      Always perform false positive analysis before any package changes
+    </practice>
+    <practice priority="critical">
+      Provide specific evidence with file paths and line numbers
+    </practice>
+    <practice priority="high">
+      When uncertain, default to TRUE POSITIVE (safer approach)
+    </practice>
+    <practice priority="high">
+      Include code snippets to support analysis
+    </practice>
+    <practice priority="medium">
+      Consider deployment context and security controls
+    </practice>
+    <practice priority="medium">
+      Document all findings clearly for engineer review
+    </practice>
+  </best_practices>
+
+  <troubleshooting>
+    <issue name="search_fails">
+      <symptom>search_files or read_file tools fail</symptom>
+      <solution>Document failure and default to TRUE POSITIVE</solution>
+    </issue>
+
+    <issue name="inconclusive_analysis">
+      <symptom>Cannot definitively determine if false positive</symptom>
+      <solution>Default to TRUE POSITIVE and proceed with remediation</solution>
+    </issue>
+
+    <issue name="complex_codebase">
+      <symptom>Codebase too complex to analyze fully</symptom>
+      <solution>Perform best-effort analysis, document limitations, default to TRUE POSITIVE</solution>
+    </issue>
+
+    <issue name="concert_api_fails">
+      <symptom>Concert API unavailable during research</symptom>
+      <solution>Document issue, proceed with external CVE research, note Concert validation pending</solution>
+    </issue>
+  </troubleshooting>
+
+  <migration_guide>
+    <title>Migrating from devops-concert-shell to devops-concert-shell-v2</title>
+
+    <step number="1">
+      <action>Update GitHub Actions workflow</action>
+      <change>Change chat_mode from 'devops-concert-shell' to 'devops-concert-shell-v2'</change>
+    </step>
+
+    <step number="2">
+      <action>Create downgrade-false-positive workflow</action>
+      <change>Add new workflow to handle 'false-positive' label</change>
+      <file>.github/workflows/downgrade-false-positive.yml</file>
+    </step>
+
+    <step number="3">
+      <action>Update issue templates</action>
+      <change>Add note about false positive detection capability</change>
+    </step>
+
+    <step number="4">
+      <action>Train team</action>
+      <change>Educate DevOps engineers on reviewing false positive analyses</change>
+    </step>
+
+    <backward_compatibility>
+      The original devops-concert-shell mode remains available for workflows
+      that don't need false positive detection.
+    </backward_compatibility>
+  </migration_guide>
+
+  <summary>
+    <title>Key Takeaways</title>
+
+    <takeaway>
+      DevOps Concert Shell V2 adds intelligent false positive detection to prevent
+      unnecessary package upgrades and breaking changes.
+    </takeaway>
+
+    <takeaway>
+      The mode analyzes source code to determine if vulnerable functions are actually
+      used in exploitable ways before creating remediation PRs.
+    </takeaway>
+
+    <takeaway>
+      False positives are reported via GitHub issue comments, with engineer confirmation
+      triggering Concert API updates.
+    </takeaway>
+
+    <takeaway>
+      True positives proceed with normal CVE remediation workflow (branch, manifest updates, PR).
+    </takeaway>
+
+    <takeaway>
+      The mode reduces DevOps workload, CI/CD noise, and risk of breaking changes while
+      maintaining security posture.
+    </takeaway>
+  </summary>
+</mode_overview>
+
+<!-- Made with Bob -->
