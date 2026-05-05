@@ -302,23 +302,43 @@ flask==2.3.3  # Fixed CVE-2023-30861 per Concert recommendation
     <false_positive_update>
       <description>False positive updates handled in same workflow after approval</description>
       <trigger>DevOps engineer approves devops-approval environment</trigger>
-      <workflow>bob-shell-v2.yml (Step 2A)</workflow>
-      <endpoint>PATCH /concert/ingestion/api/v1/vulnerability_assessments</endpoint>
+      <workflow>bob-shell-v2.yml (Step 2A: false-positive-approval-gate job)</workflow>
+      <endpoint>PATCH /concert/ingestion/api/v1/vulnerability_assessments/cve/{cve_id}/application/{application_name}</endpoint>
+      <method>One PATCH request per CVE (simpler than batch update)</method>
+      <execution>
+        <step>Bob Shell is invoked again in devops-concert-shell-v2 mode</step>
+        <step>Bob reads the GitHub issue to extract CVE IDs and application name</step>
+        <step>Bob executes one PATCH request per CVE using the simplified endpoint</step>
+        <step>Bob posts success/failure comment on issue and closes it if successful</step>
+      </execution>
       <payload>
         <![CDATA[
 {
-  "assessments": [{
-    "findings_id": "...",
-    "assessment_id": "...",
-    "status": "False positive",
-    "application_id": "...",
-    "cve": "CVE-YYYY-XXXXX",
-    "comment": "..."
-  }]
+  "status": "False positive",
+  "comment": "Detailed justification from analysis. See GitHub issue link."
 }
         ]]>
       </payload>
-      <note>This mode does NOT call this endpoint - separate workflow handles it</note>
+      <example>
+        <![CDATA[
+curl -kX PATCH \
+  -H "Authorization: ${CONCERT_API_KEY}" \
+  -H "InstanceId: ${CONCERT_INSTANCE_ID}" \
+  -H "Content-Type: application/json" \
+  "${CONCERT_HOSTNAME}/concert/ingestion/api/v1/vulnerability_assessments/cve/CVE-2023-32681/application/sample-python-app" \
+  -d '{"status": "False positive", "comment": "Application does not use vulnerable functions."}'
+        ]]>
+      </example>
+      <advantages>
+        <advantage>No need to query for findings_id or assessment_id</advantage>
+        <advantage>Simpler payload structure</advantage>
+        <advantage>Direct CVE and application name mapping</advantage>
+        <advantage>Easier to debug and maintain</advantage>
+      </advantages>
+      <important>
+        This endpoint IS called by Bob in Step 2A after DevOps approval.
+        The workflow invokes Bob Shell again specifically to execute these Concert API updates.
+      </important>
     </false_positive_update>
 
     <true_positive_tracking>

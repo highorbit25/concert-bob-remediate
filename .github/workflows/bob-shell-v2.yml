@@ -397,41 +397,42 @@ jobs:
             2. Find your previous false positive analysis comment on the issue
                - Look for comment containing "🔍 False Positive Detection" or "False Positive Analysis"
                - Extract ALL CVE IDs from your comment (e.g., CVE-2023-32681, CVE-2024-35195)
-               - Extract package name and application name from your comment or issue body
+               - Extract application name from your comment or issue body
             
-            3. Query Concert API (source .env for credentials: CONCERT_API_KEY, CONCERT_HOSTNAME, CONCERT_INSTANCE_ID):
-               a. GET /core/api/v1/applications to find application ID
-               b. GET /core/api/v1/applications/{id}/vulnerability_details to get findings_id and assessment_id for EACH CVE
-            
-            4. Build Concert API PATCH request payload:
-               - Endpoint: /ingestion/api/v1/vulnerability_assessments
+            3. For EACH CVE, update Concert API using the simplified endpoint:
+               - Endpoint: PATCH ${CONCERT_HOSTNAME}/concert/ingestion/api/v1/vulnerability_assessments/cve/{cve_id}/application/{application_name}
                - Method: PATCH
-               - Headers: Authorization, InstanceId, Content-Type: application/json
+               - Headers:
+                 * Authorization: ${CONCERT_API_KEY}
+                 * InstanceId: ${CONCERT_INSTANCE_ID}
+                 * Content-Type: application/json
                - Payload format:
                  {
-                   "assessments": [
-                     {
-                       "findings_id": "...",
-                       "assessment_id": "...",
-                       "status": "False positive",
-                       "application_id": "...",
-                       "cve": "CVE-XXXX-XXXXX",
-                       "comment": "See https://github.com/${{ github.repository }}/issues/${{ needs.devops-cve-research.outputs.issue_number }}"
-                     },
-                     ... (one object for each CVE)
-                   ]
+                   "status": "False positive",
+                   "comment": "Detailed justification from analysis. See https://github.com/${{ github.repository }}/issues/${{ needs.devops-cve-research.outputs.issue_number }}"
                  }
-            
-            5. Execute the PATCH request to update ALL CVEs in a single batch
                
-               ⚠️ CRITICAL OUTPUT REQUIREMENT ⚠️
+               Example curl command (source .env first):
+               curl -kX PATCH \
+                 -H "Authorization: ${CONCERT_API_KEY}" \
+                 -H "InstanceId: ${CONCERT_INSTANCE_ID}" \
+                 -H "Content-Type: application/json" \
+                 "${CONCERT_HOSTNAME}/concert/ingestion/api/v1/vulnerability_assessments/cve/CVE-2023-32681/application/sample-python-app" \
+                 -d '{"status": "False positive", "comment": "..."}'
+            
+            4. Execute the PATCH request for EACH CVE separately
+               
+               ⚠️ CRITICAL OUTPUT REQUIREMENTS ⚠️
                - Do NOT include the curl command in your output or logs
                - Do NOT echo, print, or display the PATCH request command
                - Do NOT show the command syntax in any form
-               - ONLY report the API response (success/failure status)
-               - GitHub Actions will fail if you output the curl command
+               - Do NOT output heredoc delimiters like EOF, EOL, END, etc.
+               - Do NOT output multi-line code blocks with ``` that span many lines
+               - ONLY report the API response (success/failure status) in plain text
+               - Keep output concise and avoid special characters
+               - GitHub Actions will fail if you output problematic strings
                
-               Execute the PATCH silently and report only the result.
+               Execute the PATCH silently and report only the result in simple text format.
             
             6. Post a success comment on the GitHub issue with:
                - List of all CVEs updated
