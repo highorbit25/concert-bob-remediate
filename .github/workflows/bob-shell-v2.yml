@@ -422,12 +422,12 @@ jobs:
             
             4. Execute the PATCH request for EACH CVE separately
                
-               ⚠️ CRITICAL OUTPUT REQUIREMENTS ⚠️
+               CRITICAL OUTPUT REQUIREMENTS:
                - Do NOT include the curl command in your output or logs
                - Do NOT echo, print, or display the PATCH request command
                - Do NOT show the command syntax in any form
                - Do NOT output heredoc delimiters like EOF, EOL, END, etc.
-               - Do NOT output multi-line code blocks with ``` that span many lines
+               - Do NOT output multi-line code blocks with triple backticks that span many lines
                - ONLY report the API response (success/failure status) in plain text
                - Keep output concise and avoid special characters
                - GitHub Actions will fail if you output problematic strings
