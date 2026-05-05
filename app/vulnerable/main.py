@@ -3,6 +3,7 @@ import sqlite3
 from flask import Flask, request, render_template_string, jsonify, session
 import pickle
 import subprocess
+import requests  # Used for safe HTTP requests only
 
 app = Flask(__name__)
 
@@ -44,6 +45,7 @@ def index():
             <li><a href="/greet?name=John">Greet User</a></li>
             <li><a href="/execute?cmd=ls">Execute Command</a></li>
             <li><a href="/load">Load Data</a></li>
+            <li><a href="/weather">Get Weather (uses requests safely)</a></li>
         </ul>
     '''
 
@@ -165,6 +167,46 @@ def admin():
     # VULNERABILITY 12: Insufficient authorization check
     if session.get('authenticated'):
         # No role-based access control
+
+@app.route('/weather')
+def get_weather():
+    """
+    Fetch weather data from a public API using requests library.
+    
+    This function uses requests safely and is NOT affected by:
+    - CVE-2023-32681: No proxy authentication used
+    - CVE-2024-35195: Uses default certificate verification (verify=True)
+    - CVE-2024-47081: No .netrc file credentials used
+    - CVE-2026-25645: No file extraction operations
+    
+    Only uses: requests.get() with default settings
+    """
+    try:
+        # Safe usage: Simple GET request to public API
+        # - No proxies parameter (CVE-2023-32681 not applicable)
+        # - Default verify=True (CVE-2024-35195 not applicable)
+        # - No auth parameter or .netrc (CVE-2024-47081 not applicable)
+        # - No file operations (CVE-2026-25645 not applicable)
+        response = requests.get(
+            'https://api.open-meteo.com/v1/forecast',
+            params={
+                'latitude': 52.52,
+                'longitude': 13.41,
+                'current_weather': 'true'
+            },
+            timeout=5  # Good practice: set timeout
+        )
+        response.raise_for_status()
+        
+        weather_data = response.json()
+        return jsonify({
+            'temperature': weather_data.get('current_weather', {}).get('temperature'),
+            'windspeed': weather_data.get('current_weather', {}).get('windspeed'),
+            'source': 'Open-Meteo API'
+        })
+    except requests.exceptions.RequestException as e:
+        return jsonify({'error': f'Failed to fetch weather: {str(e)}'}), 500
+
         return jsonify({'admin_data': 'sensitive information'})
     return jsonify({'error': 'Not authenticated'}), 401
 
