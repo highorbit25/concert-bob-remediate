@@ -418,7 +418,7 @@ jobs:
                  -H "InstanceId: ${CONCERT_INSTANCE_ID}" \
                  -H "Content-Type: application/json" \
                  "${CONCERT_HOSTNAME}/concert/ingestion/api/v1/vulnerability_assessments/cve/CVE-2023-32681/application/sample-python-app" \
-                 -d '{"status": "False positive", "comment": "..."}'
+                 -d "{\"status\": \"False positive\", \"comment\": \"...\"}"
             
             4. Execute the PATCH request for EACH CVE separately
                
