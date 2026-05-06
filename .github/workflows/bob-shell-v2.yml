@@ -387,7 +387,7 @@ jobs:
           prompt: |
             DevOps engineer has approved the false positive determination for GitHub issue #${{ needs.devops-cve-research.outputs.issue_number }}.
             
-            Your task: Update Concert API to mark all false positive CVEs as "False positive" status.
+            Your task: Update Concert API to mark all false positive CVEs as "False positive" status using batch PATCH.
             
             Concert API credentials are available in the .env file in the repository root.
             
@@ -399,23 +399,60 @@ jobs:
                - Extract ALL CVE IDs from your comment (e.g., CVE-2023-32681, CVE-2024-35195)
                - Extract application name from your comment or issue body
             
-            3. For EACH CVE, update Concert API using the simplified endpoint:
-               - Endpoint: PATCH <CONCERT_HOSTNAME>/concert/ingestion/api/v1/vulnerability_assessments/cve/{cve_id}/application/{application_name}
+            3. For EACH CVE, retrieve assessment details to get findings_id, assessment_id, and application_id:
+               - Endpoint: GET <CONCERT_HOSTNAME>/concert/core/api/v1/vulnerability/cves/{cve_id}/assessments?page_number=1&page_size=50&sort_by=age&sort_direction=asc
+               - Method: GET
+               - Headers:
+                 * Authorization: <CONCERT_API_KEY from .env>
+                 * InstanceId: <CONCERT_INSTANCE_ID from .env>
+               - Filter the response to find the assessment matching GitHub issue #${{ needs.devops-cve-research.outputs.issue_number }}
+                 * Look for "issues" array in response
+                 * Match "issue_id": "${{ needs.devops-cve-research.outputs.issue_number }}" in the issues array
+               - Extract from the matched assessment:
+                 * findings_id: response.assessments[].id (where issue_id matches)
+                 * assessment_id: response.assessments[].assessment_id
+                 * application_id: response.assessments[].application_id
+                 * cve: The CVE ID being processed
+               
+               Example response structure:
+               {
+                 "assessments": [{
+                   "id": "8a3a7993-9ab4-4da7-b66c-8d4b93fd0e54",  // This is findings_id
+                   "assessment_id": "0dc8df40-cc24-4725-ad82-39c2c223a1de",
+                   "application_id": "423a1150-d090-42f2-b4f1-36d674f028a8",
+                   "issues": [{
+                     "issue_id": "98",  // Match this with GitHub issue number
+                     "url": "https://github.com/..."
+                   }]
+                 }]
+               }
+            
+            4. Build batch PATCH payload with all CVE assessments:
+               - Collect all findings_id, assessment_id, application_id for each CVE
+               - Create assessments array with all CVEs
+               - Payload format:
+                 {
+                   "assessments": [
+                     {
+                       "findings_id": "<findings_id from step 3>",
+                       "assessment_id": "<assessment_id from step 3>",
+                       "status": "False positive",
+                       "application_id": "<application_id from step 3>",
+                       "cve": "<CVE-ID>",
+                       "comment": "Detailed justification from analysis. See https://github.com/${{ github.repository }}/issues/${{ needs.devops-cve-research.outputs.issue_number }}"
+                     }
+                     // ... repeat for each CVE
+                   ]
+                 }
+            
+            5. Execute single batch PATCH request:
+               - Endpoint: PATCH <CONCERT_HOSTNAME>/concert/ingestion/api/v1/vulnerability_assessments
                - Method: PATCH
                - Headers:
                  * Authorization: <CONCERT_API_KEY from .env>
                  * InstanceId: <CONCERT_INSTANCE_ID from .env>
                  * Content-Type: application/json
-               - Payload format:
-                 {
-                   "status": "False positive",
-                   "comment": "Detailed justification from analysis. See https://github.com/${{ github.repository }}/issues/${{ needs.devops-cve-research.outputs.issue_number }}"
-                 }
-               
-               Example: First source .env, then execute curl with the loaded environment variables.
-               The .env file contains CONCERT_API_KEY, CONCERT_HOSTNAME, and CONCERT_INSTANCE_ID.
-            
-            4. Execute the PATCH request for EACH CVE separately
+               - Body: The assessments payload from step 4
                
                CRITICAL OUTPUT REQUIREMENTS:
                - Do NOT include the curl command in your output or logs
@@ -439,13 +476,15 @@ jobs:
             
             7. If any errors occur:
                - Post error comment with the error details encountered
-               - List which CVEs failed to update
+               - List which CVEs failed to update (if partial failure)
                - Do NOT close the issue
                - Do NOT provide manual remediation steps, just log the error
             
             CRITICAL REQUIREMENTS:
             - Extract ALL CVE IDs from your previous comment
-            - Update all CVEs in a single batch API call
+            - For each CVE, GET assessment details and filter by GitHub issue ID
+            - Build single batch payload with all CVE assessments
+            - Execute ONE batch PATCH request for all CVEs
             - Handle missing CVEs gracefully (some may not be in Concert)
             - Provide clear success/error feedback
             - Close issue only on complete success
