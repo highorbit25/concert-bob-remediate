@@ -400,11 +400,11 @@ jobs:
                - Extract application name from your comment or issue body
             
             3. For EACH CVE, update Concert API using the simplified endpoint:
-               - Endpoint: PATCH ${CONCERT_HOSTNAME}/concert/ingestion/api/v1/vulnerability_assessments/cve/{cve_id}/application/{application_name}
+               - Endpoint: PATCH <CONCERT_HOSTNAME>/concert/ingestion/api/v1/vulnerability_assessments/cve/{cve_id}/application/{application_name}
                - Method: PATCH
                - Headers:
-                 * Authorization: ${CONCERT_API_KEY}
-                 * InstanceId: ${CONCERT_INSTANCE_ID}
+                 * Authorization: <CONCERT_API_KEY from .env>
+                 * InstanceId: <CONCERT_INSTANCE_ID from .env>
                  * Content-Type: application/json
                - Payload format:
                  {
@@ -412,13 +412,8 @@ jobs:
                    "comment": "Detailed justification from analysis. See https://github.com/${{ github.repository }}/issues/${{ needs.devops-cve-research.outputs.issue_number }}"
                  }
                
-               Example curl command (source .env first):
-               curl -kX PATCH \
-                 -H "Authorization: ${CONCERT_API_KEY}" \
-                 -H "InstanceId: ${CONCERT_INSTANCE_ID}" \
-                 -H "Content-Type: application/json" \
-                 "${CONCERT_HOSTNAME}/concert/ingestion/api/v1/vulnerability_assessments/cve/CVE-2023-32681/application/sample-python-app" \
-                 -d "{\"status\": \"False positive\", \"comment\": \"...\"}"
+               Example: First source .env, then execute curl with the loaded environment variables.
+               The .env file contains CONCERT_API_KEY, CONCERT_HOSTNAME, and CONCERT_INSTANCE_ID.
             
             4. Execute the PATCH request for EACH CVE separately
                
