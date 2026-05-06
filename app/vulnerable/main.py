@@ -167,6 +167,8 @@ def admin():
     # VULNERABILITY 12: Insufficient authorization check
     if session.get('authenticated'):
         # No role-based access control
+        return jsonify({'admin_data': 'sensitive information'})
+    return jsonify({'error': 'Not authenticated'}), 401
 
 @app.route('/weather')
 def get_weather():
@@ -206,9 +208,6 @@ def get_weather():
         })
     except requests.exceptions.RequestException as e:
         return jsonify({'error': f'Failed to fetch weather: {str(e)}'}), 500
-
-        return jsonify({'admin_data': 'sensitive information'})
-    return jsonify({'error': 'Not authenticated'}), 401
 
 if __name__ == '__main__':
     init_db()
