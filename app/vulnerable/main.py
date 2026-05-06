@@ -35,7 +35,8 @@ def init_db():
 @app.route('/')
 def index():
     # VULNERABILITY 3: Using deprecated Flask attribute (Breaking change in Flask 2.0+)
-    if request.is_xhr:
+    # Fixed: request.is_xhr removed in Werkzeug 2.0+, use modern approach
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return 'This was an AJAX request'
     return '''
         <h1>Vulnerable Flask App</h1>
@@ -167,6 +168,8 @@ def admin():
     # VULNERABILITY 12: Insufficient authorization check
     if session.get('authenticated'):
         # No role-based access control
+        return jsonify({'admin_data': 'sensitive information'})
+    return jsonify({'error': 'Not authenticated'}), 401
 
 @app.route('/weather')
 def get_weather():
