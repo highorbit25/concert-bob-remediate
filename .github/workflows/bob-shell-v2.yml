@@ -148,14 +148,27 @@ jobs:
                i. Exit workflow - Bob has commented on the issue
             
             4b. IF ANY CVE IS A TRUE POSITIVE:
-               a. Proceed with package upgrade (fixes all CVEs)
-               b. Document which CVEs are being fixed
-               c. Note any false positive CVEs in PR description
+               Follow the complete True Positive Package Remediation workflow in .bob/rules-devops-concert-shell-v2/2_complete_workflow_guide.xml
+               
+               Key steps:
+               a. Create remediation branch (Step 1)
+               b. Update package manifests (Step 2)
+               c. Verify package compatibility with dry-run validation (Step 3)
+               d. Commit changes (Step 4)
+               e. Push branch (Step 5)
+               f. Create pull request (Step 6)
+               g. Link PR to issue (Step 7)
+               h. Output PR metadata (Step 8)
+               
+               IMPORTANT:
+               - Consider transitive dependencies when upgrading packages
+               - Always validate upgrades using ecosystem-specific dry-run commands
+               - Create PR as DRAFT if validation fails
+               - Document which CVEs are being fixed
+               - Note any false positive CVEs in PR description
             
-            5. IF TRUE POSITIVE - Apply the package fix:
-               a. Apply the package fix to the manifest files (requirements.txt, package.json, etc.)
-               b. IMPORTANT: Consider transitive dependencies when upgrading packages
-               c. For Python projects: Run 'pip install -r requirements.txt --dry-run' to verify all requirements can be met
+            5. DEPRECATED - See 4b above for complete workflow
+               (This section kept for backward compatibility but follow 4b instructions)
             
             6. Create a branch following the naming convention: fix/cve-{CVE-ID}-{package-name}
             

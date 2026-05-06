@@ -193,11 +193,154 @@ flask==2.3.3  # Fixed CVE-2023-30861 per Concert recommendation
         <step number="3">
           <name>Verify Package Compatibility</name>
           <details>
-            Python: pip install -r requirements.txt --dry-run
-            Node.js: npm install --dry-run
-            Check for transitive dependency conflicts
-            Document any compatibility concerns
+            CRITICAL: Always validate package upgrades using dry-run commands before creating PR.
+            This catches dependency conflicts, breaking changes, and compatibility issues early.
           </details>
+          
+          <validation_by_ecosystem>
+            <python>
+              <manifest_files>requirements.txt, setup.py, pyproject.toml, Pipfile</manifest_files>
+              <commands>
+                <command>pip install -r requirements.txt --dry-run</command>
+                <command>pip install --dry-run -e .</command>
+              </commands>
+              <checks>
+                <check>Verify all dependencies can be resolved without conflicts</check>
+                <check>Check for version incompatibilities</check>
+                <check>Ensure no circular dependencies</check>
+              </checks>
+            </python>
+            
+            <nodejs>
+              <manifest_files>package.json, package-lock.json, yarn.lock</manifest_files>
+              <commands>
+                <command>npm install --dry-run</command>
+                <command>yarn install --dry-run</command>
+              </commands>
+              <checks>
+                <check>Check for peer dependency warnings or conflicts</check>
+                <check>Verify no breaking changes in dependencies</check>
+                <check>Ensure lockfile consistency</check>
+              </checks>
+            </nodejs>
+            
+            <java_maven>
+              <manifest_files>pom.xml</manifest_files>
+              <commands>
+                <command>mvn dependency:tree -DoutputFile=deps.txt</command>
+                <command>mvn validate</command>
+              </commands>
+              <checks>
+                <check>Check for dependency conflicts or version mismatches</check>
+                <check>Verify no duplicate dependencies</check>
+                <check>Ensure all dependencies are resolvable</check>
+              </checks>
+            </java_maven>
+            
+            <java_gradle>
+              <manifest_files>build.gradle, build.gradle.kts</manifest_files>
+              <commands>
+                <command>gradle dependencies --dry-run</command>
+                <command>gradle build --dry-run</command>
+              </commands>
+              <checks>
+                <check>Verify no dependency resolution failures</check>
+                <check>Check for version conflicts</check>
+                <check>Ensure build configuration is valid</check>
+              </checks>
+            </java_gradle>
+            
+            <ruby>
+              <manifest_files>Gemfile, Gemfile.lock</manifest_files>
+              <commands>
+                <command>bundle install --dry-run</command>
+                <command>bundle check</command>
+              </commands>
+              <checks>
+                <check>Ensure all gems can be resolved</check>
+                <check>Check for version conflicts</check>
+                <check>Verify platform compatibility</check>
+              </checks>
+            </ruby>
+            
+            <go>
+              <manifest_files>go.mod, go.sum</manifest_files>
+              <commands>
+                <command>go mod verify</command>
+                <command>go mod tidy -v</command>
+              </commands>
+              <checks>
+                <check>Check for module verification errors</check>
+                <check>Verify checksums match</check>
+                <check>Ensure no missing dependencies</check>
+              </checks>
+            </go>
+            
+            <dotnet>
+              <manifest_files>*.csproj, packages.config, *.fsproj, *.vbproj</manifest_files>
+              <commands>
+                <command>dotnet restore --no-cache</command>
+                <command>nuget restore -NoCache</command>
+              </commands>
+              <checks>
+                <check>Verify package restoration succeeds</check>
+                <check>Check for version conflicts</check>
+                <check>Ensure all packages are available</check>
+              </checks>
+            </dotnet>
+            
+            <php>
+              <manifest_files>composer.json, composer.lock</manifest_files>
+              <commands>
+                <command>composer update --dry-run</command>
+                <command>composer validate</command>
+              </commands>
+              <checks>
+                <check>Check for dependency conflicts</check>
+                <check>Verify composer.json is valid</check>
+                <check>Ensure all packages are resolvable</check>
+              </checks>
+            </php>
+            
+            <rust>
+              <manifest_files>Cargo.toml, Cargo.lock</manifest_files>
+              <commands>
+                <command>cargo check --locked</command>
+                <command>cargo update --dry-run</command>
+              </commands>
+              <checks>
+                <check>Verify dependencies compile</check>
+                <check>Check for version conflicts</check>
+                <check>Ensure lockfile is consistent</check>
+              </checks>
+            </rust>
+          </validation_by_ecosystem>
+          
+          <validation_failure_handling>
+            <if_validation_fails>
+              <action>Document the specific error in PR description</action>
+              <action>Explain why the upgrade cannot be applied cleanly</action>
+              <action>List conflicting dependencies and version requirements</action>
+              <action>Suggest alternative approaches (e.g., upgrade transitive deps first)</action>
+              <action>Create PR as DRAFT to signal manual intervention needed</action>
+              <action>Add label: 'needs-manual-review'</action>
+            </if_validation_fails>
+            
+            <if_validation_succeeds>
+              <action>Proceed with creating PR normally</action>
+              <action>Include validation results in PR description</action>
+              <action>Note which validation commands were run</action>
+              <action>Confirm no dependency conflicts detected</action>
+            </if_validation_succeeds>
+          </validation_failure_handling>
+          
+          <best_practices>
+            <practice>Always run validation before committing changes</practice>
+            <practice>Check for both direct and transitive dependency conflicts</practice>
+            <practice>Document validation results in PR description</practice>
+            <practice>If multiple ecosystems present, validate all of them</practice>
+            <practice>Consider running validation in clean environment (no cache)</practice>
+          </best_practices>
         </step>
 
         <step number="4">
