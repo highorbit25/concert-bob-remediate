@@ -389,14 +389,6 @@ jobs:
             
             Your task: Update Concert API to mark all false positive CVEs as "False positive" status using batch PATCH.
             
-            IMPORTANT: Before executing ANY curl commands, you MUST first load the environment variables by running:
-            set -a && source .env && set +a
-            
-            The .env file contains:
-            - CONCERT_API_KEY (with quotes)
-            - CONCERT_HOSTNAME (with quotes)
-            - CONCERT_INSTANCE_ID (with quotes)
-            
             WORKFLOW STEPS:
             
             STEP 1: Read GitHub issue and extract CVE information
@@ -405,18 +397,29 @@ jobs:
             - Extract ALL CVE IDs from your comment (e.g., CVE-2023-32681, CVE-2024-35195)
             - Store the list of CVE IDs for processing
             
-            STEP 2: Load environment variables and retrieve assessment details
-            - FIRST, execute: set -a && source .env && set +a
-            - This loads CONCERT_API_KEY, CONCERT_HOSTNAME, and CONCERT_INSTANCE_ID into your shell environment
+            STEP 2: Read Concert API credentials from .env file
+            - Read the .env file in the repository root
+            - Extract these three values (they are quoted strings):
+              * CONCERT_API_KEY
+              * CONCERT_HOSTNAME
+              * CONCERT_INSTANCE_ID
+            - Store these values to use in curl commands
+            - The .env file format is: KEY="value"
+            
+            STEP 3: Retrieve assessment details for each CVE
             - For EACH CVE ID extracted in Step 1:
-              a) Execute a GET request to retrieve assessment details (replace {CVE_ID} with actual CVE):
-                 Use curl with the loaded environment variables
-                 GET endpoint: ${CONCERT_HOSTNAME}/concert/core/api/v1/vulnerability/cves/{CVE_ID}/assessments?page_number=1&page_size=50&sort_by=age&sort_direction=asc
-                 Headers: Authorization: ${CONCERT_API_KEY}, instanceId: ${CONCERT_INSTANCE_ID}
+              a) Execute a GET request using the credentials from Step 2:
+                 - Method: GET
+                 - URL: <CONCERT_HOSTNAME>/concert/core/api/v1/vulnerability/cves/<CVE_ID>/assessments?page_number=1&page_size=50&sort_by=age&sort_direction=asc
+                 - Headers:
+                   * Authorization: <CONCERT_API_KEY>
+                   * instanceId: <CONCERT_INSTANCE_ID>
+                 - Use curl -kX GET with these headers
               
               b) Parse the JSON response to find the assessment matching GitHub issue #${{ needs.devops-cve-research.outputs.issue_number }}
                  - Look in the "assessments" array
                  - Find the assessment where issues[].issue_id equals "${{ needs.devops-cve-research.outputs.issue_number }}"
+                 - Example: If issue_id is "101", find the assessment with "issues": [{"issue_id": "101", ...}]
               
               c) Extract these values from the matched assessment:
                  - findings_id: The "id" field (e.g., "8a3a7993-9ab4-4da7-b66c-8d4b93fd0e54")
@@ -425,9 +428,9 @@ jobs:
               
               d) Store these values for building the batch payload
             
-            STEP 3: Build the batch PATCH payload
+            STEP 4: Build the batch PATCH payload
             - Create a JSON payload with an "assessments" array
-            - For each CVE processed in Step 2, add an object with:
+            - For each CVE processed in Step 3, add an object with:
               * "findings_id": The findings_id extracted
               * "assessment_id": The assessment_id extracted
               * "status": "False positive"
@@ -449,11 +452,16 @@ jobs:
               ]
             }
             
-            STEP 4: Execute the batch PATCH request
+            STEP 5: Execute the batch PATCH request
             - Execute ONE curl PATCH command to update all CVEs
-            - PATCH endpoint: ${CONCERT_HOSTNAME}/concert/ingestion/api/v1/vulnerability_assessments
-            - Headers: Authorization: ${CONCERT_API_KEY}, instanceId: ${CONCERT_INSTANCE_ID}, Content-Type: application/json
-            - Body: The JSON payload from Step 3
+            - Method: PATCH
+            - URL: <CONCERT_HOSTNAME>/concert/ingestion/api/v1/vulnerability_assessments
+            - Headers:
+              * Authorization: <CONCERT_API_KEY>
+              * instanceId: <CONCERT_INSTANCE_ID>
+              * Content-Type: application/json
+            - Body: The JSON payload from Step 4
+            - Use curl -kX PATCH with these headers and the JSON body
             
             CRITICAL OUTPUT REQUIREMENTS:
             - Do NOT include the curl command in your output or logs
@@ -465,7 +473,7 @@ jobs:
             - Keep output concise and avoid special characters
             - Execute commands silently and report only results
             
-            STEP 5: Post success comment on GitHub issue
+            STEP 6: Post success comment on GitHub issue
             - List all CVEs updated
             - Include Application ID
             - Add timestamp
@@ -473,18 +481,18 @@ jobs:
             - Add label: 'false-positive'
             - Close the issue
             
-            STEP 6: Error handling
+            STEP 7: Error handling
             - If any errors occur, post error comment with details
             - List which CVEs failed to update (if partial failure)
             - Do NOT close the issue on error
             - Do NOT provide manual remediation steps
             
             CRITICAL REQUIREMENTS:
-            - ALWAYS load environment variables FIRST with: set -a && source .env && set +a
+            - Read .env file directly and extract values (don't use shell source)
             - Process ALL CVE IDs from your previous comment
             - Filter assessments by GitHub issue ID to ensure correct match
             - Execute ONE batch PATCH request for all CVEs
-            - Handle missing CVEs gracefully
+            - Handle missing CVEs gracefully (some may not exist in Concert)
             - Close issue only on complete success
           settings: ${{ vars.BOBSHELL_SETTINGS }}
   
