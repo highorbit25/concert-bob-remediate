@@ -496,10 +496,10 @@ jobs:
             - Close issue only on complete success
           settings: ${{ vars.BOBSHELL_SETTINGS }}
   
-  # STEP 2B: True Positive - DevOps Environment Approval Gate
+  # STEP 2: True Positive - DevOps Environment Approval Gate
   # ============================================================================
   devops-approval-gate:
-    name: "2B: True Positive - Pause for DevOps Approval"
+    name: "2: Pause for DevOps Approval"
     runs-on: ubuntu-latest
     needs: devops-cve-research
     if: |
