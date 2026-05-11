@@ -209,10 +209,14 @@ def get_weather():
     except requests.exceptions.RequestException as e:
         return jsonify({'error': f'Failed to fetch weather: {str(e)}'}), 500
 
-if __name__ == '__main__':
-    init_db()
-    # VULNERABILITY 13: Debug mode enabled in production (Configuration Vulnerability)
-    # VULNERABILITY 14: Binding to all interfaces (0.0.0.0) (Configuration Vulnerability)
-    app.run(host='0.0.0.0', port=5001, debug=True)
+# Initialize database on module load (runs in production)
+init_db()
 
-# Made with Bob
+# VULNERABILITY 13: Debug mode enabled in production (Configuration Vulnerability)
+# VULNERABILITY 14: Binding to all interfaces (0.0.0.0) (Configuration Vulnerability)
+if __name__ == '__main__':
+    # Run with debugger enabled
+    app.run(host='0.0.0.0', port=5001, debug=True)
+else:
+    app.debug = True
+    app.config['DEBUG'] = True
