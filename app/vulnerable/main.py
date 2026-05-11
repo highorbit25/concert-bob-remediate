@@ -156,7 +156,7 @@ def login():
     password = request.form.get('password')
     
     # VULNERABILITY 11: Weak session management
-    # Using default Flask session without secure settings
+    session.permanent = True
     session['user'] = username
     session['authenticated'] = True
     
