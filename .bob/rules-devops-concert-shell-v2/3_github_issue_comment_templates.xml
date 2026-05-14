@@ -117,10 +117,6 @@ search_files:
 ### ✅ Recommendation
 
 **No action required.** The vulnerable package is present in our dependency tree but is never used by our application. The vulnerability cannot be exploited.
-
-### 🎯 Next Steps
-
-@devops-engineer If you agree, please approve the `devops-approval` environment in the workflow run to trigger Concert API update.
         ]]>
       </content>
     </template>
@@ -166,10 +162,6 @@ While our application uses `{package-name}`, it does **not use the vulnerable fe
 ### ✅ Recommendation
 
 **No action required.** The vulnerable code path is not reachable in our application.
-
-### 🎯 Next Steps
-
-@devops-engineer If you agree, please approve the `devops-approval` environment in the workflow run to trigger Concert API update.
         ]]>
       </content>
     </template>
@@ -224,10 +216,6 @@ The vulnerable function is only reachable after input passes through security co
 **No action required.** Security controls effectively prevent exploitation of this vulnerability.
 
 **Note**: Ensure security controls remain in place. If controls are removed, this CVE should be re-evaluated.
-
-### 🎯 Next Steps
-
-@devops-engineer If you agree, please approve the `devops-approval` environment in the workflow run to trigger Concert API update.
         ]]>
       </content>
     </template>
@@ -280,10 +268,6 @@ Internet → Firewall → VPN → Internal Network → This Service
 **No action required.** The deployment context prevents exploitation by untrusted actors.
 
 **Note**: If deployment changes to expose this service externally, this CVE should be re-evaluated.
-
-### 🎯 Next Steps
-
-@devops-engineer If you agree, please approve the `devops-approval` environment in the workflow run to trigger Concert API update.
         ]]>
       </content>
     </template>
@@ -331,10 +315,6 @@ Application Start → Load Config → Check {feature-name}
 **No action required.** The vulnerable feature is disabled and cannot be exploited.
 
 **Note**: If configuration changes to enable this feature, this CVE should be re-evaluated.
-
-### 🎯 Next Steps
-
-@devops-engineer If you agree, please approve the `devops-approval` environment in the workflow run to trigger Concert API update.
         ]]>
       </content>
     </template>

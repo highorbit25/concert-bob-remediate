@@ -302,19 +302,19 @@ jobs:
               - Request Software Lead review`
             });
       
-      # - name: Request DevOps Review
-      #   if: steps.check-false-positive.outputs.false_positive_detected == 'false'
-      #   uses: actions/github-script@v7
-      #   with:
-      #     github-token: ${{ secrets.GITHUB_TOKEN }}
-      #     script: |
-      #       const prNumber = ${{ steps.bob-devops.outputs.pr_number }};
-      #       await github.rest.pulls.requestReviewers({
-      #         owner: context.repo.owner,
-      #         repo: context.repo.repo,
-      #         pull_number: prNumber,
-      #         reviewers: ${{ vars.DEVOPS_REVIEWERS }}  // DevOps Team
-      #       });
+      - name: Request DevOps Review
+        if: steps.check-false-positive.outputs.false_positive_detected == 'false'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = ${{ steps.bob-devops.outputs.pr_number }};
+            await github.rest.pulls.requestReviewers({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              reviewers: ${{ vars.DEVOPS_REVIEWERS }}  // DevOps Team
+            });
       
       - name: Add workflow metadata label
         if: steps.check-false-positive.outputs.false_positive_detected == 'false'
