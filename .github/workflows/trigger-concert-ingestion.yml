@@ -3,8 +3,14 @@ name: Trigger Concert Ingestion Job
 on:
   push:
     branches:
-      - main
+      # - main
+      - tanstack-demo  # Enable Concert scanning for TanStack demo branch
   workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to scan (default: current branch)'
+        required: false
+        type: string
 
 jobs:
   trigger-ingestion:
@@ -57,4 +63,8 @@ jobs:
           echo "- **Triggered By**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Supported Branches" >> $GITHUB_STEP_SUMMARY
+          echo "- \`main\` - Python Flask demo (legacy)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`tanstack-demo\` - TanStack npm demo (primary)" >> $GITHUB_STEP_SUMMARY
 

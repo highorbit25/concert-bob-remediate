@@ -13,8 +13,8 @@ import './App.css';
  * 1. TRUE POSITIVE: TanStack Query supply chain attack
  *    - @tanstack/react-query@5.62.1 was compromised (Dec 2024)
  *    - Malicious code exfiltrated environment variables
- *    - Current version: 5.62.3 (SAFE)
- *    - Bob will detect this as TRUE POSITIVE and create PR to upgrade
+ *    - Current version: 5.62.1 (VULNERABLE - but withdrawn from npm)
+ *    - Bob will detect this as TRUE POSITIVE and create PR to upgrade to 5.62.3
  * 
  * 2. FALSE POSITIVE: axios SSRF vulnerability
  *    - axios@1.5.1 has CVE-2023-45857 (SSRF)
@@ -53,8 +53,8 @@ function App() {
               <span className="badge badge-critical">Supply Chain Attack</span>
             </div>
             <p className="section-description">
-              This component uses <code>@tanstack/react-query@5.62.3</code> (safe version).
-              The workflow simulates detecting the compromised version 5.62.1 and upgrading to 5.62.3.
+              This component uses <code>@tanstack/react-query@5.62.1</code> (compromised version - withdrawn from npm).
+              Concert will detect this vulnerability and Bob will create a PR to upgrade to 5.62.3.
             </p>
             <UserList />
           </section>
@@ -106,8 +106,8 @@ function App() {
         <footer className="app-footer">
           <p>
             <strong>Note:</strong> This is a demonstration application. The TanStack supply chain
-            attack occurred in December 2024. This demo uses safe versions (5.62.3+) and simulates
-            the remediation workflow.
+            attack occurred in December 2024. This demo uses the actual vulnerable version (5.62.1)
+            which has been withdrawn from npm, making it safe to reference but impossible to install.
           </p>
         </footer>
       </div>

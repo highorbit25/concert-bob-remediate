@@ -241,16 +241,20 @@ customModes:
       ```json
       {
         "dependencies": {
-          "express": "^4.17.1"  // CVE-2024-XXXXX
+          "express": "^4.17.1",  // CVE-2024-XXXXX
+          "@tanstack/react-query": "5.62.1"  // CVE-2024-XXXXX (supply chain attack)
         }
       }
       // Updated to:
       {
         "dependencies": {
-          "express": "^4.18.2"  // Fixed CVE-2024-XXXXX per Concert
+          "express": "^4.18.2",  // Fixed CVE-2024-XXXXX per Concert
+          "@tanstack/react-query": "^5.62.3"  // Fixed supply chain attack per Concert
         }
       }
       ```
+
+      **Note**: For npm packages, also update package-lock.json by running `npm install` after manifest changes.
 
       ### Java (pom.xml)
       ```xml
@@ -521,16 +525,22 @@ customModes:
       ```json
       {
         "dependencies": {
-          "express": "^4.17.1"
+          "express": "^4.17.1",
+          "@tanstack/react-query": "5.62.1",  // Supply chain attack
+          "axios": "1.5.1"  // CVE-2023-45857
         }
       }
 
       {
         "dependencies": {
-          "express": "^4.18.2"
+          "express": "^4.18.2",
+          "@tanstack/react-query": "^5.62.3",  // Fixed supply chain attack
+          "axios": "^1.6.0"  // Fixed CVE-2023-45857
         }
       }
       ```
+
+      **Important for npm**: After updating package.json, the package-lock.json must also be updated by running `npm install` to ensure lockfile consistency.
 
       ### Java (pom.xml)
       ```xml
@@ -803,10 +813,17 @@ customModes:
 
       ### Step 2: Search Codebase for Usage
       - Use [`search_files`](search_files) to find all imports/requires of the vulnerable package
+      - For npm packages, search for: `import.*from.*['"]package-name['"]` or `require\(['"]package-name['"]\)`
+      - For Python packages, search for: `import package_name` or `from package_name import`
       - Identify all files that use the package
       - Search for specific vulnerable function calls mentioned in each CVE
       - Check configuration files for relevant settings
       - **Note**: The same package usage analysis applies to all CVEs for that package
+
+      **Example npm package searches**:
+      - TanStack Query: `import.*from.*['"]@tanstack/react-query['"]`
+      - axios: `import.*axios.*from.*['"]axios['"]` or `require\(['"]axios['"]\)`
+      - Express: `import.*express.*from.*['"]express['"]` or `const.*express.*=.*require\(['"]express['"]\)`
 
       ### Step 3: Analyze Usage Patterns (Per CVE)
       - Read identified files to understand how the package is used

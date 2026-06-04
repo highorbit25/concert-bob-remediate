@@ -153,7 +153,11 @@ jobs:
                Key steps:
                a. Create remediation branch (Step 1)
                b. Update package manifests (Step 2)
+                  - For Python: Update requirements.txt or app/vulnerable/requirements.txt
+                  - For npm: Update package.json (dependencies or devDependencies)
                c. Verify package compatibility with dry-run validation (Step 3)
+                  - For Python: pip install --dry-run -r requirements.txt
+                  - For npm: npm install --dry-run (validates package.json)
                d. Commit changes (Step 4)
                e. Push branch (Step 5)
                f. Create pull request (Step 6)
@@ -161,11 +165,14 @@ jobs:
                h. Output PR metadata (Step 8)
                
                IMPORTANT:
+               - Detect ecosystem: Check for package.json (npm) or requirements.txt (Python)
                - Consider transitive dependencies when upgrading packages
                - Always validate upgrades using ecosystem-specific dry-run commands
                - Create PR as DRAFT if validation fails
                - Document which CVEs are being fixed
                - Note any false positive CVEs in PR description
+               - For npm: ONLY update package.json, do NOT run npm install (versions may be withdrawn)
+               - For npm: Tests will run AFTER PR is created with safe versions
             
             5. DEPRECATED - See 4b above for complete workflow
                (This section kept for backward compatibility but follow 4b instructions)
@@ -567,6 +574,7 @@ jobs:
       tests_passed: ${{ steps.run-tests.outputs.tests_passed }}
       pr_number: ${{ needs.devops-approval-gate.outputs.pr_number }}
       pr_branch: ${{ needs.devops-approval-gate.outputs.pr_branch }}
+      ecosystem: ${{ steps.detect-ecosystem.outputs.ecosystem }}
     
     steps:
       - name: Checkout PR Branch
@@ -574,24 +582,85 @@ jobs:
         with:
           ref: ${{ needs.devops-approval-gate.outputs.pr_branch }}
       
+      - name: Detect Ecosystem from PR Changes
+        id: detect-ecosystem
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = Number(`${{ needs.devops-approval-gate.outputs.pr_number }}`.trim());
+            
+            // Get PR files to determine which ecosystem was affected
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+            
+            // Check which files were modified
+            const modifiedFiles = files.map(f => f.filename);
+            console.log('Modified files:', modifiedFiles);
+            
+            let ecosystem = 'unknown';
+            
+            // Check for npm ecosystem changes
+            if (modifiedFiles.some(f => f === 'package.json' || f === 'package-lock.json')) {
+              ecosystem = 'npm';
+              console.log('📦 Detected npm ecosystem (package.json modified)');
+            }
+            // Check for Python ecosystem changes
+            else if (modifiedFiles.some(f => f.includes('requirements.txt'))) {
+              ecosystem = 'python';
+              console.log('🐍 Detected Python ecosystem (requirements.txt modified)');
+            }
+            
+            core.setOutput('ecosystem', ecosystem);
+            core.info(`Ecosystem: ${ecosystem}`);
+      
+      - name: Setup Node.js
+        if: steps.detect-ecosystem.outputs.ecosystem == 'npm'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
       - name: Set up Python
+        if: steps.detect-ecosystem.outputs.ecosystem == 'python'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       
-      - name: Install dependencies
-        id: install-deps
+      - name: Install npm dependencies
+        if: steps.detect-ecosystem.outputs.ecosystem == 'npm'
+        id: install-npm-deps
+        run: |
+          echo "📦 Installing npm dependencies from PR (safe versions)..."
+          npm ci
+        continue-on-error: true
+      
+      - name: Install Python dependencies
+        if: steps.detect-ecosystem.outputs.ecosystem == 'python'
+        id: install-python-deps
         working-directory: app/vulnerable
         run: pip install -r requirements.txt
         continue-on-error: true
       
       - name: Run unit tests
         id: run-tests
-        working-directory: app/vulnerable
         run: |
           set +e
-          python -m unittest test_main.py -v
-          TEST_EXIT_CODE=$?
+          if [[ "${{ steps.detect-ecosystem.outputs.ecosystem }}" == "npm" ]]; then
+            echo "🧪 Running npm tests..."
+            npm test
+            TEST_EXIT_CODE=$?
+          elif [[ "${{ steps.detect-ecosystem.outputs.ecosystem }}" == "python" ]]; then
+            echo "🧪 Running Python tests..."
+            cd app/vulnerable
+            python -m unittest test_main.py -v
+            TEST_EXIT_CODE=$?
+          else
+            echo "❌ Unknown ecosystem"
+            TEST_EXIT_CODE=1
+          fi
           set -e
           
           if [[ $TEST_EXIT_CODE -eq 0 ]]; then
@@ -670,7 +739,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '20'
+      
+      - name: Set up Python
+        if: needs.run-unit-tests-after-approval.outputs.ecosystem == 'python'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
       
       - name: Configure Git
         run: |
@@ -688,10 +763,14 @@ jobs:
           prompt: |
             Fix the failing unit tests in PR #${{ needs.run-unit-tests-after-approval.outputs.pr_number }}.
             
+            Ecosystem: ${{ needs.run-unit-tests-after-approval.outputs.ecosystem }}
+            
             Follow this workflow:
             1. Analyze the PR at https://github.com/${{ github.repository }}/pull/${{ needs.run-unit-tests-after-approval.outputs.pr_number }}
             2. Understand what package was upgraded and why tests are failing
             3. Run the unit tests locally to see the exact failures
+               - For npm: Run `npm test`
+               - For Python: Run `python -m unittest test_main.py -v` in app/vulnerable/
             4. Fix the code to work with the upgraded package
             5. Verify all tests pass
             6. Commit your fixes to the EXISTING PR branch: ${{ needs.run-unit-tests-after-approval.outputs.pr_branch }}
@@ -706,13 +785,31 @@ jobs:
           git pull origin ${{ needs.run-unit-tests-after-approval.outputs.pr_branch }}
           echo "✅ Pulled latest changes from PR branch"
       
-      - name: Verify Tests Now Pass
-        id: verify-tests
+      - name: Verify Tests Now Pass (npm)
+        if: needs.run-unit-tests-after-approval.outputs.ecosystem == 'npm'
+        id: verify-tests-npm
+        run: |
+          npm ci
+          npm test
+        continue-on-error: true
+      
+      - name: Verify Tests Now Pass (Python)
+        if: needs.run-unit-tests-after-approval.outputs.ecosystem == 'python'
+        id: verify-tests-python
         working-directory: app/vulnerable
         run: |
           pip install -r requirements.txt
           python -m unittest test_main.py -v
         continue-on-error: true
+      
+      - name: Set verification outcome
+        id: verify-tests
+        run: |
+          if [[ "${{ needs.run-unit-tests-after-approval.outputs.ecosystem }}" == "npm" ]]; then
+            echo "outcome=${{ steps.verify-tests-npm.outcome }}" >> $GITHUB_OUTPUT
+          else
+            echo "outcome=${{ steps.verify-tests-python.outcome }}" >> $GITHUB_OUTPUT
+          fi
       
       - name: Report Remediation Results
         uses: actions/github-script@v7

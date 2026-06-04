@@ -1,20 +1,42 @@
 # Concert + Bob Vulnerability Remediation
-This repo contains a sample vulnerable python application
 
-We will showcase a workflow for vulnerability remediation using Concert + Bob
+This repository demonstrates an automated CVE remediation workflow using IBM Concert and Bob Shell, featuring both **npm (Node.js/React)** and **Python (Flask)** vulnerable applications.
+
+## Demo Scenarios
+
+### 1. TanStack Supply Chain Attack (npm) - **Primary Demo**
+A realistic demonstration using the December 2024 TanStack npm package compromise:
+- **TRUE POSITIVE**: [@tanstack/react-query@5.62.1](package.json) - Actual supply chain attack requiring upgrade to 5.62.3+
+- **FALSE POSITIVE**: [axios@1.5.1](package.json) - CVE-2023-45857 (SSRF) but code uses axios safely with hardcoded URLs
+
+See [TanStack Attack Analysis](docs/tanstack-attack-analysis.md) and [False Positive Methodology](docs/false-positive-methodology.md) for details.
+
+### 2. Python Flask CVE (Python) - **Legacy Demo**
+Original demonstration using Python Flask vulnerabilities in [`app/vulnerable/`](app/vulnerable/)
+
+We showcase a complete workflow for vulnerability remediation using Concert + Bob
 
 ![Workflow Diagram](./workflow_diagram.png)
 
-## Workflow Overview
-This automated [workflow](./.github/workflows/bob-shell-v2.yml) orchestrates CVE remediation through four key stages:
+📊 **[View Interactive Workflow Diagrams](docs/workflow-diagrams.md)** - Detailed Mermaid diagrams showing the complete CVE remediation process
 
-1. **DevOps Phase** - Bob Shell researches the CVE using Concert API and external sources (NVD, GitHub Advisory), performs false positive detection, then creates a PR with package upgrades (if needed)
+## Workflow Overview
+
+This automated [workflow](./.github/workflows/bob-shell-v2.yml) orchestrates CVE remediation through five key stages:
+
+1. **DevOps Phase** - Bob Shell researches the CVE using Concert API and external sources (NVD, GitHub Advisory, OSV), performs intelligent false positive detection, then creates a PR with package upgrades (if needed)
 2. **DevOps Approval** - DevOps engineer reviews and approves the package changes on GitHub UI
 3. **Unit Testing** - Automated tests run against the upgraded dependencies to verify compatibility
 4. **Code Remediation** - If tests fail, Bob Shell automatically fixes application code to work with the new package versions
-5. **Merge & Deploy** - Software Lead assigned to perform code review before changes are merged and deployed to production
+5. **Merge & Deploy** - Software Lead performs code review before changes are merged and deployed to production
 
-The workflow uses Bob Shell in two specialized modes: `devops-concert-shell-v2` for CVE research with false positive detection and package upgrades, while using `advanced` mode for code fixes. Each stage includes automated PR comments, reviewer assignments, and label management to track progress.
+The workflow uses Bob Shell in two specialized modes:
+- [`devops-concert-shell-v2`](.bob/custom_modes.yaml) - CVE research with false positive detection and package upgrades
+- [`advanced`](.bob/custom_modes.yaml) - Application code fixes when tests fail
+
+**Multi-Ecosystem Support**: The workflow automatically detects whether a CVE affects npm or Python packages by examining PR file changes, then runs the appropriate test commands.
+
+Each stage includes automated PR comments, reviewer assignments, and label management to track progress.
 
 ## False Positive Detection
 
@@ -34,11 +56,14 @@ The workflow includes intelligent false positive detection to prevent unnecessar
 ### Common False Positive Scenarios
 
 - **Transitive Dependency** - Package is a dependency of a dependency, never directly used
-- **Unused Feature** - Vulnerable feature of the package is not used (e.g., Flask app doesn't use cookies but CVE affects cookie parsing)
+- **Unused Feature** - Vulnerable feature of the package is not used
+  - Example: Flask app doesn't use cookies but CVE affects cookie parsing
+  - Example: axios CVE-2023-45857 (SSRF) but code only uses hardcoded URLs with user input in query params
 - **Unreachable Code** - Vulnerable functions exist but code paths are unreachable
 - **Internal Only** - Service is internal-only, not exposed to untrusted users
 - **Security Controls** - Input validation, WAF, or other controls prevent exploitation
 - **Disabled Feature** - Vulnerable feature is disabled in configuration
+- **Safe Usage Pattern** - Package is used in a way that doesn't trigger the vulnerability
 
 ### False Positive Workflow
 
@@ -74,7 +99,56 @@ When a true positive is confirmed:
 
 When the analysis is inconclusive or uncertain, the workflow defaults to **TRUE POSITIVE** and proceeds with remediation. This ensures that potential vulnerabilities are not missed, even if it means some unnecessary upgrades.
 
-### Initial Setup:
+## Demo Applications
+
+### TanStack React Application (Primary)
+
+A modern React application demonstrating real-world vulnerability scenarios:
+
+**Location**: Root directory ([`package.json`](package.json), [`src/`](src/))
+
+**Vulnerable Packages**:
+```json
+{
+  "@tanstack/react-query": "5.62.1",  // Supply chain attack (Dec 2024)
+  "axios": "1.5.1"                     // CVE-2023-45857 (SSRF)
+}
+```
+
+**Components**:
+- [`UserList.jsx`](src/components/UserList.jsx) - Uses TanStack Query (TRUE POSITIVE)
+- [`Weather.jsx`](src/components/Weather.jsx) - Uses axios safely (FALSE POSITIVE)
+
+**Tests**: [`src/test/`](src/test/) - 60+ test cases covering component functionality
+
+**Run locally**:
+```bash
+npm install  # Only installs after Bob creates PR with safe versions
+npm run dev  # Start development server
+npm test     # Run unit tests
+```
+
+### Python Flask Application (Legacy)
+
+Original vulnerable Flask application for Python CVE demonstrations:
+
+**Location**: [`app/vulnerable/`](app/vulnerable/)
+
+**Vulnerable Packages**: See [`requirements.txt`](app/vulnerable/requirements.txt)
+
+**Run locally**:
+```bash
+cd app/vulnerable
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python main.py
+python -m unittest test_main.py
+```
+
+## Initial Setup
+
+### Configure GitHub Action Secrets
 #### Configure the following Github Action Secrets
 `https://github.com/highorbit25/concert-bob-remediate/settings/secrets/actions`
 
@@ -115,17 +189,9 @@ SWE_REVIEWERS=['swe-user']
 2. Add `Deployment protection rules` > `Required reviewers` > Select `devops-user`
 
 
-#### Use this `requirements.txt` in ./app/vulnerable with vulnerable packages
-```
-click==8.1.8
-Flask==1.1.2
-itsdangerous==1.1.0
-Jinja2==3.1.6
-MarkupSafe==3.0.2
-Werkzeug==0.16.1
-```
+## Bob Shell Configuration
 
-### Bob shell
+### Bob Shell
 For development purposes, Bob shell is currently installed on the Github Actions runner when the Github Action is triggered, followed by the configuration of Github MCP server. The custom 'devops-concert-shell' mode is also configured in the `.bob` directory in the repository. 
 
 For an actual production setup, a dedicated Github runner with Bob shell installed and settings pre-configured can be used.
