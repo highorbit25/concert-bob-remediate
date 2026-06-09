@@ -169,10 +169,32 @@
             
             <s:form action="check-credit" method="post">
                 <div class="form-group">
+                    <label for="firstName">First Name</label>
+                    <s:textfield
+                        name="firstName"
+                        id="firstName"
+                        placeholder="Enter your first name"
+                        required="true"
+                    />
+                    <div class="help-text">Enter your legal first name</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="lastName">Last Name</label>
+                    <s:textfield
+                        name="lastName"
+                        id="lastName"
+                        placeholder="Enter your last name"
+                        required="true"
+                    />
+                    <div class="help-text">Enter your legal last name</div>
+                </div>
+                
+                <div class="form-group">
                     <label for="ssn">Social Security Number</label>
-                    <s:textfield 
-                        name="ssn" 
-                        id="ssn" 
+                    <s:textfield
+                        name="ssn"
+                        id="ssn"
                         placeholder="XXX-XX-XXXX"
                         maxlength="11"
                         required="true"
