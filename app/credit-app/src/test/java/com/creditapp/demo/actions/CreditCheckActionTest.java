@@ -24,7 +24,7 @@ public class CreditCheckActionTest {
         
         String result = action.execute();
         
-        assertEquals("SUCCESS", result);
+        assertEquals("success", result);
         assertNotNull(action.getCreditReport());
         assertTrue(action.getCreditScore() > 0);
     }
@@ -36,7 +36,7 @@ public class CreditCheckActionTest {
         
         String result = action.execute();
         
-        assertEquals("INPUT", result);
+        assertEquals("input", result);
         assertTrue(action.hasActionErrors());
     }
     
@@ -47,7 +47,7 @@ public class CreditCheckActionTest {
         
         String result = action.execute();
         
-        assertEquals("INPUT", result);
+        assertEquals("input", result);
         assertTrue(action.hasActionErrors());
     }
     
@@ -58,7 +58,7 @@ public class CreditCheckActionTest {
         
         String result = action.execute();
         
-        assertEquals("INPUT", result);
+        assertEquals("input", result);
         assertTrue(action.hasActionErrors());
     }
     
