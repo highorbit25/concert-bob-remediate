@@ -179,13 +179,13 @@
                 <div class="feature-card">
                     <h3>👤 Consumer Data</h3>
                     <p>View and manage consumer information including personal and financial data.</p>
-                    <a href="consumer-lookup.jsp" class="btn">View Data</a>
+                    <a href="consumer-data.jsp" class="btn">View Data</a>
                 </div>
                 
                 <div class="feature-card">
                     <h3>📝 Dispute Management</h3>
                     <p>File and track credit report disputes with supporting documentation.</p>
-                    <a href="dispute-form.jsp" class="btn">File Dispute</a>
+                    <a href="dispute.jsp" class="btn">File Dispute</a>
                 </div>
                 
                 <div class="feature-card vulnerable">

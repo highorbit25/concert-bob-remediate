@@ -25,7 +25,7 @@
         </action>
         
         <!-- Credit Check Action -->
-        <action name="credit-check" class="com.creditapp.demo.actions.CreditCheckAction">
+        <action name="check-credit" class="com.creditapp.demo.actions.CreditCheckAction">
             <result name="success">/credit-report.jsp</result>
             <result name="input">/credit-check.jsp</result>
             <result name="error">/error.jsp</result>
@@ -33,21 +33,15 @@
         
         <!-- Consumer Data Action -->
         <action name="consumer-data" class="com.creditapp.demo.actions.ConsumerDataAction">
-            <result name="success">/consumer-data.jsp</result>
-            <result name="input">/consumer-lookup.jsp</result>
+            <result name="success">/consumer-details.jsp</result>
+            <result name="input">/consumer-data.jsp</result>
             <result name="error">/error.jsp</result>
         </action>
         
         <!-- Dispute Actions -->
-        <action name="dispute-list" class="com.creditapp.demo.actions.DisputeAction" method="list">
-            <result name="success">/dispute-list.jsp</result>
-            <result name="input">/dispute-lookup.jsp</result>
-            <result name="error">/error.jsp</result>
-        </action>
-        
-        <action name="dispute-create" class="com.creditapp.demo.actions.DisputeAction" method="create">
-            <result name="success">/dispute-success.jsp</result>
-            <result name="input">/dispute-form.jsp</result>
+        <action name="dispute" class="com.creditapp.demo.actions.DisputeAction" method="create">
+            <result name="success">/dispute-confirmation.jsp</result>
+            <result name="input">/dispute.jsp</result>
             <result name="error">/error.jsp</result>
         </action>
         
