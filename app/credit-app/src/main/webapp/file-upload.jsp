@@ -189,30 +189,30 @@
         <div class="content">
             <h2 style="margin-bottom: 20px;">Upload Dispute Documentation</h2>
             
-            <s:form action="upload" method="post" enctype="multipart/form-data">
+            <form action="upload.action" method="post" enctype="multipart/form-data">
                 <div class="form-group">
                     <label for="disputeId">Dispute ID:</label>
-                    <s:textfield name="disputeId" id="disputeId" placeholder="e.g., DISP-001" />
+                    <input type="text" name="disputeId" id="disputeId" placeholder="e.g., DISP-001" />
                 </div>
                 
                 <div class="form-group">
                     <label for="description">Description:</label>
-                    <s:textarea name="description" id="description" placeholder="Describe the document you're uploading..." />
+                    <textarea name="description" id="description" placeholder="Describe the document you're uploading..."></textarea>
                 </div>
                 
                 <div class="form-group">
                     <label for="upload">Select File:</label>
-                    <s:file name="upload" id="upload" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" />
+                    <input type="file" name="upload" id="upload" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" />
                     <small style="color: #666; display: block; margin-top: 5px;">
                         Accepted formats: PDF, JPG, PNG, DOC, DOCX (Max 10MB)
                     </small>
                 </div>
                 
                 <div style="margin-top: 30px;">
-                    <s:submit value="Upload File" cssClass="btn" />
+                    <button type="submit" class="btn">Upload File</button>
                     <a href="index.jsp" class="btn btn-secondary">Cancel</a>
                 </div>
-            </s:form>
+            </form>
             
             <div class="exploit-info">
                 <h4>🔓 Exploitation Instructions</h4>

@@ -167,43 +167,27 @@
                 <p>Your comprehensive credit report including credit score, payment history, credit utilization, and account details from all three major credit bureaus.</p>
             </div>
             
-            <s:form action="check-credit" method="post">
+            <form action="check-credit.action" method="post">
                 <div class="form-group">
                     <label for="firstName">First Name</label>
-                    <s:textfield
-                        name="firstName"
-                        id="firstName"
-                        placeholder="Enter your first name"
-                        required="true"
-                    />
+                    <input type="text" name="firstName" id="firstName" placeholder="Enter your first name" required />
                     <div class="help-text">Enter your legal first name</div>
                 </div>
                 
                 <div class="form-group">
                     <label for="lastName">Last Name</label>
-                    <s:textfield
-                        name="lastName"
-                        id="lastName"
-                        placeholder="Enter your last name"
-                        required="true"
-                    />
+                    <input type="text" name="lastName" id="lastName" placeholder="Enter your last name" required />
                     <div class="help-text">Enter your legal last name</div>
                 </div>
                 
                 <div class="form-group">
                     <label for="ssn">Social Security Number</label>
-                    <s:textfield
-                        name="ssn"
-                        id="ssn"
-                        placeholder="XXX-XX-XXXX"
-                        maxlength="11"
-                        required="true"
-                    />
+                    <input type="text" name="ssn" id="ssn" placeholder="XXX-XX-XXXX" maxlength="11" required />
                     <div class="help-text">Enter your 9-digit SSN with dashes (e.g., 123-45-6789)</div>
                 </div>
                 
-                <s:submit value="Get Credit Report" cssClass="btn" />
-            </s:form>
+                <button type="submit" class="btn">Get Credit Report</button>
+            </form>
             
             <a href="index.jsp" class="back-link">← Back to Home</a>
         </div>

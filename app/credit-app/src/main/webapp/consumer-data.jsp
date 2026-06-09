@@ -186,20 +186,15 @@
                 </ul>
             </div>
             
-            <s:form action="consumer-data" method="post">
+            <form action="consumer-data.action" method="post">
                 <div class="form-group">
                     <label for="consumerId">Consumer ID</label>
-                    <s:textfield 
-                        name="consumerId" 
-                        id="consumerId" 
-                        placeholder="Enter Consumer ID (1-147)"
-                        required="true"
-                    />
+                    <input type="text" name="consumerId" id="consumerId" placeholder="Enter Consumer ID (1-147)" required />
                     <div class="help-text">Enter a numeric consumer ID from our database (1-147)</div>
                 </div>
                 
-                <s:submit value="Retrieve Consumer Data" cssClass="btn" />
-            </s:form>
+                <button type="submit" class="btn">Retrieve Consumer Data</button>
+            </form>
             
             <a href="index.jsp" class="back-link">← Back to Home</a>
         </div>

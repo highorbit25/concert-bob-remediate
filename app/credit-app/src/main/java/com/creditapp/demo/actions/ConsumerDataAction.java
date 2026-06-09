@@ -26,7 +26,15 @@ public class ConsumerDataAction extends ActionSupport {
                 return INPUT;
             }
             
-            consumer = consumerService.getConsumer(consumerId);
+            // Normalize consumer ID - if numeric, convert to CONS-XXX format
+            String normalizedId = consumerId.trim();
+            if (normalizedId.matches("\\d+")) {
+                // Numeric input - convert to CONS-XXX format
+                int id = Integer.parseInt(normalizedId);
+                normalizedId = "CONS-" + String.format("%03d", id);
+            }
+            
+            consumer = consumerService.getConsumer(normalizedId);
             
             if (consumer == null) {
                 addActionError("Consumer not found: " + consumerId);

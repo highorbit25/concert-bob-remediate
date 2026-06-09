@@ -186,81 +186,52 @@
                 </ul>
             </div>
             
-            <s:form action="dispute" method="post">
+            <form action="dispute.action" method="post">
                 <div class="form-group">
                     <label for="consumerName">Full Name <span class="required">*</span></label>
-                    <s:textfield 
-                        name="consumerName" 
-                        id="consumerName" 
-                        placeholder="Enter your full legal name"
-                        required="true"
-                    />
+                    <input type="text" name="consumerName" id="consumerName" placeholder="Enter your full legal name" required />
                 </div>
                 
                 <div class="form-group">
                     <label for="ssn">Social Security Number <span class="required">*</span></label>
-                    <s:textfield 
-                        name="ssn" 
-                        id="ssn" 
-                        placeholder="XXX-XX-XXXX"
-                        maxlength="11"
-                        required="true"
-                    />
+                    <input type="text" name="ssn" id="ssn" placeholder="XXX-XX-XXXX" maxlength="11" required />
                     <div class="help-text">Required for identity verification</div>
                 </div>
                 
                 <div class="form-group">
                     <label for="disputeType">Type of Dispute <span class="required">*</span></label>
-                    <s:select 
-                        name="disputeType" 
-                        id="disputeType"
-                        list="#{
-                            'personal_info':'Incorrect Personal Information',
-                            'account_not_mine':'Account Does Not Belong to Me',
-                            'incorrect_balance':'Incorrect Account Balance',
-                            'incorrect_status':'Incorrect Account Status',
-                            'duplicate':'Duplicate Account',
-                            'outdated':'Outdated Negative Information',
-                            'other':'Other'
-                        }"
-                        required="true"
-                    />
+                    <select name="disputeType" id="disputeType" required>
+                        <option value="">-- Select Dispute Type --</option>
+                        <option value="personal_info">Incorrect Personal Information</option>
+                        <option value="account_not_mine">Account Does Not Belong to Me</option>
+                        <option value="incorrect_balance">Incorrect Account Balance</option>
+                        <option value="incorrect_status">Incorrect Account Status</option>
+                        <option value="duplicate">Duplicate Account</option>
+                        <option value="outdated">Outdated Negative Information</option>
+                        <option value="other">Other</option>
+                    </select>
                 </div>
                 
                 <div class="form-group">
                     <label for="accountNumber">Account Number (if applicable)</label>
-                    <s:textfield 
-                        name="accountNumber" 
-                        id="accountNumber" 
-                        placeholder="Enter the account number in question"
-                    />
+                    <input type="text" name="accountNumber" id="accountNumber" placeholder="Enter the account number in question" />
                     <div class="help-text">Leave blank if disputing personal information</div>
                 </div>
                 
                 <div class="form-group">
                     <label for="description">Detailed Description <span class="required">*</span></label>
-                    <s:textarea 
-                        name="description" 
-                        id="description" 
-                        placeholder="Please provide a detailed explanation of the inaccuracy and why you believe it is incorrect. Include any relevant dates, amounts, or other details."
-                        required="true"
-                    />
+                    <textarea name="description" id="description" placeholder="Please provide a detailed explanation of the inaccuracy and why you believe it is incorrect. Include any relevant dates, amounts, or other details." required></textarea>
                     <div class="help-text">Be as specific as possible to help us investigate your dispute</div>
                 </div>
                 
                 <div class="form-group">
                     <label for="contactEmail">Email Address <span class="required">*</span></label>
-                    <s:textfield 
-                        name="contactEmail" 
-                        id="contactEmail" 
-                        placeholder="your.email@example.com"
-                        required="true"
-                    />
+                    <input type="email" name="contactEmail" id="contactEmail" placeholder="your.email@example.com" required />
                     <div class="help-text">We'll send updates about your dispute to this email</div>
                 </div>
                 
-                <s:submit value="Submit Dispute" cssClass="btn" />
-            </s:form>
+                <button type="submit" class="btn">Submit Dispute</button>
+            </form>
             
             <a href="index.jsp" class="back-link">← Back to Home</a>
         </div>
