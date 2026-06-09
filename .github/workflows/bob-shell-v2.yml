@@ -574,19 +574,44 @@ jobs:
         with:
           ref: ${{ needs.devops-approval-gate.outputs.pr_branch }}
       
+      - name: Detect Application Type
+        id: detect-app
+        run: |
+          if [[ -f "app/credit-app/pom.xml" ]]; then
+            echo "app_type=java" >> $GITHUB_OUTPUT
+            echo "📦 Detected Java application (Maven)"
+          elif [[ -f "app/vulnerable/requirements.txt" ]]; then
+            echo "app_type=python" >> $GITHUB_OUTPUT
+            echo "🐍 Detected Python application"
+          else
+            echo "app_type=unknown" >> $GITHUB_OUTPUT
+            echo "⚠️ Unknown application type"
+          fi
+      
       - name: Set up Python
+        if: steps.detect-app.outputs.app_type == 'python'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       
-      - name: Install dependencies
+      - name: Set up Java 8
+        if: steps.detect-app.outputs.app_type == 'java'
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+          cache: 'maven'
+      
+      - name: Install Python dependencies
+        if: steps.detect-app.outputs.app_type == 'python'
         id: install-deps
         working-directory: app/vulnerable
         run: pip install -r requirements.txt
         continue-on-error: true
       
-      - name: Run unit tests
-        id: run-tests
+      - name: Run Python unit tests
+        if: steps.detect-app.outputs.app_type == 'python'
+        id: run-python-tests
         working-directory: app/vulnerable
         run: |
           set +e
@@ -600,6 +625,34 @@ jobs:
             echo "tests_passed=false" >> $GITHUB_OUTPUT
           fi
         continue-on-error: true
+      
+      - name: Run Java unit tests
+        if: steps.detect-app.outputs.app_type == 'java'
+        id: run-java-tests
+        working-directory: app/credit-app
+        run: |
+          set +e
+          mvn clean test
+          TEST_EXIT_CODE=$?
+          set -e
+          
+          if [[ $TEST_EXIT_CODE -eq 0 ]]; then
+            echo "tests_passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "tests_passed=false" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+      
+      - name: Set test results
+        id: run-tests
+        run: |
+          if [[ "${{ steps.detect-app.outputs.app_type }}" == "python" ]]; then
+            echo "tests_passed=${{ steps.run-python-tests.outputs.tests_passed }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ steps.detect-app.outputs.app_type }}" == "java" ]]; then
+            echo "tests_passed=${{ steps.run-java-tests.outputs.tests_passed }}" >> $GITHUB_OUTPUT
+          else
+            echo "tests_passed=false" >> $GITHUB_OUTPUT
+          fi
       
       - name: Report Test Results
         uses: actions/github-script@v7
