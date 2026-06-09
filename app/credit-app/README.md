@@ -49,6 +49,58 @@ The vulnerability exists in the Jakarta Multipart parser used by Apache Struts f
 - Maven 3.6+
 - Git
 
+### Installing Java 8 on macOS
+
+If you have Java 17 installed, you need to install and switch to Java 8:
+
+#### Option 1: Using Homebrew (Recommended)
+
+```bash
+# Install Java 8 via Homebrew
+brew install openjdk@8
+
+# Add to PATH (add to ~/.zshrc or ~/.bash_profile)
+export PATH="/opt/homebrew/opt/openjdk@8/bin:$PATH"
+export JAVA_HOME="/opt/homebrew/opt/openjdk@8"
+
+# Reload shell configuration
+source ~/.zshrc  # or source ~/.bash_profile
+
+# Verify Java 8 is active
+java -version
+# Should show: openjdk version "1.8.x"
+```
+
+#### Option 2: Using SDKMAN (Multiple Java Versions)
+
+```bash
+# Install SDKMAN
+curl -s "https://get.sdkman.io" | bash
+source "$HOME/.sdkman/bin/sdkman-init.sh"
+
+# Install Java 8
+sdk install java 8.0.392-zulu
+
+# Use Java 8 for current shell
+sdk use java 8.0.392-zulu
+
+# Set Java 8 as default
+sdk default java 8.0.392-zulu
+
+# Verify
+java -version
+```
+
+#### Option 3: Download from Oracle/Adoptium
+
+1. Download Java 8 from [Adoptium](https://adoptium.net/temurin/releases/?version=8)
+2. Install the `.pkg` file
+3. Set JAVA_HOME:
+```bash
+export JAVA_HOME=$(/usr/libexec/java_home -v 1.8)
+export PATH="$JAVA_HOME/bin:$PATH"
+```
+
 ### Installation
 
 ```bash
