@@ -43,7 +43,9 @@ The vulnerability exists in the Jakarta Multipart parser used by Apache Struts f
 
 ### Prerequisites
 
-- Java 11 or higher
+- **Java 8** (required for Struts 2.3.31 compatibility)
+  - Java 11+ will cause ASM bytecode reading errors
+  - Use `java -version` to verify
 - Maven 3.6+
 - Git
 
