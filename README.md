@@ -1,9 +1,10 @@
 # Concert + Bob Vulnerability Remediation
-This repo contains sample vulnerable applications demonstrating CVE remediation workflows using Concert + Bob.
 
-## 📦 Demo Applications
+This repo demonstrates an automated CVE remediation workflow using Concert + Bob, featuring a vulnerable Java application that replicates the 2017 Equifax data breach scenario.
 
-### Java Application - CVE-2017-5638 (Equifax Breach)
+## 📦 Demo Application
+
+### CVE-2017-5638 - Equifax Breach Scenario
 **Location**: `app/credit-app/`
 
 A vulnerable credit reporting application built with Apache Struts 2.3.31, demonstrating **CVE-2017-5638** - the critical Remote Code Execution vulnerability exploited in the 2017 Equifax data breach that compromised 147 million records.
@@ -11,15 +12,14 @@ A vulnerable credit reporting application built with Apache Struts 2.3.31, demon
 - **Vulnerability**: Apache Struts 2.3.31 (CVSS 10.0 - Critical)
 - **Attack Vector**: OGNL injection via Content-Type header
 - **Impact**: Remote Code Execution (RCE)
+- **Real-World Impact**: 2017 Equifax breach (147M records)
 - **Documentation**: See [app/credit-app/README.md](app/credit-app/README.md)
 - **Exploit Guide**: See [app/credit-app/EXPLOIT_GUIDE.md](app/credit-app/EXPLOIT_GUIDE.md)
-
-### Python Application - Multiple CVEs
-**Location**: `app/vulnerable/`
-
-A vulnerable Flask application with multiple security issues for testing various CVE scenarios.
+- **Migration Guide**: See [docs/MIGRATION_GUIDE.md](docs/MIGRATION_GUIDE.md)
 
 ---
+
+## Workflow Overview
 
 We showcase an automated workflow for vulnerability remediation using Concert + Bob
 
@@ -135,15 +135,6 @@ SWE_REVIEWERS=['swe-user']
 2. Add `Deployment protection rules` > `Required reviewers` > Select `devops-user`
 
 
-#### Use this `requirements.txt` in ./app/vulnerable with vulnerable packages
-```
-click==8.1.8
-Flask==1.1.2
-itsdangerous==1.1.0
-Jinja2==3.1.6
-MarkupSafe==3.0.2
-Werkzeug==0.16.1
-```
 
 ### Bob shell
 For development purposes, Bob shell is currently installed on the Github Actions runner when the Github Action is triggered, followed by the configuration of Github MCP server. The custom 'devops-concert-shell' mode is also configured in the `.bob` directory in the repository. 
