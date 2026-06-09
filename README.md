@@ -1,7 +1,27 @@
 # Concert + Bob Vulnerability Remediation
-This repo contains a sample vulnerable python application
+This repo contains sample vulnerable applications demonstrating CVE remediation workflows using Concert + Bob.
 
-We will showcase a workflow for vulnerability remediation using Concert + Bob
+## 📦 Demo Applications
+
+### Java Application - CVE-2017-5638 (Equifax Breach)
+**Location**: `app/credit-app/`
+
+A vulnerable credit reporting application built with Apache Struts 2.3.31, demonstrating **CVE-2017-5638** - the critical Remote Code Execution vulnerability exploited in the 2017 Equifax data breach that compromised 147 million records.
+
+- **Vulnerability**: Apache Struts 2.3.31 (CVSS 10.0 - Critical)
+- **Attack Vector**: OGNL injection via Content-Type header
+- **Impact**: Remote Code Execution (RCE)
+- **Documentation**: See [app/credit-app/README.md](app/credit-app/README.md)
+- **Exploit Guide**: See [app/credit-app/EXPLOIT_GUIDE.md](app/credit-app/EXPLOIT_GUIDE.md)
+
+### Python Application - Multiple CVEs
+**Location**: `app/vulnerable/`
+
+A vulnerable Flask application with multiple security issues for testing various CVE scenarios.
+
+---
+
+We showcase an automated workflow for vulnerability remediation using Concert + Bob
 
 ![Workflow Diagram](./workflow_diagram.png)
 
