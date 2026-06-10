@@ -41,18 +41,38 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       github.event.inputs.custom_prompt == '' &&
-      ((github.event_name == 'issues' && (github.event.action == 'opened' || github.event.label.name == 'cve-remediation')) ||
+      ((github.event_name == 'issues' && (github.event.action == 'opened' || github.event.label.name == 'cve-remediation' || github.event.label.name == 'java-app-test')) ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_to_step == '1'))
     outputs:
       pr_number: ${{ steps.bob-devops.outputs.pr_number }}
       pr_branch: ${{ steps.bob-devops.outputs.pr_branch }}
       issue_number: ${{ steps.get-issue.outputs.issue_number }}
       false_positive_detected: ${{ steps.check-false-positive.outputs.false_positive_detected }}
+      base_branch: ${{ steps.determine-branch.outputs.branch }}
     
     steps:
+      - name: Determine Target Branch Based on Label
+        id: determine-branch
+        run: |
+          if [[ "${{ github.event_name }}" == "issues" ]]; then
+            LABEL="${{ github.event.label.name }}"
+            if [[ "$LABEL" == "java-app-test" ]]; then
+              echo "branch=vuln-java-app" >> $GITHUB_OUTPUT
+              echo "🔧 Testing mode: Using vuln-java-app branch for Java application"
+            else
+              echo "branch=main" >> $GITHUB_OUTPUT
+              echo "🚀 Production mode: Using main branch for Python application"
+            fi
+          else
+            # For workflow_dispatch, default to main
+            echo "branch=vuln-java-app" >> $GITHUB_OUTPUT
+            echo "🚀 Manual trigger: Using vuln-java-app branch"
+          fi
+      
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ steps.determine-branch.outputs.branch }}
           fetch-depth: 0
       
       - name: Setup Node.js
@@ -97,6 +117,12 @@ jobs:
             Process GitHub issue #${{ steps.get-issue.outputs.issue_number }} with false positive detection.
             
             Concert API credentials are available in the .env file in the repository root.
+            
+            IMPORTANT BRANCH CONTEXT:
+            - Current base branch: ${{ steps.determine-branch.outputs.branch }}
+            - Create remediation branch FROM: ${{ steps.determine-branch.outputs.branch }}
+            - Pull request should TARGET: ${{ steps.determine-branch.outputs.branch }}
+            - This ensures changes are isolated to the correct branch
             
             Follow this workflow:
             1. Fetch the issue details from https://github.com/${{ github.repository }}/issues/${{ steps.get-issue.outputs.issue_number }}
@@ -346,6 +372,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.devops-cve-research.outputs.base_branch }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
