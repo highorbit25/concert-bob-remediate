@@ -21,8 +21,8 @@
         <!-- Use Java 8 for compatibility with Struts 2.3.31 -->
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
-        <!-- VULNERABLE: Apache Struts 2.3.31 -->
-        <struts2.version>2.3.31</struts2.version>
+        <!-- PATCHED: Apache Struts 2.3.32 - Fixes CVE-2017-5638 and 17 other CVEs -->
+        <struts2.version>2.3.32</struts2.version>
     </properties>
 
     <dependencies>
