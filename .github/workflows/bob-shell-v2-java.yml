@@ -1,4 +1,4 @@
-name: Bob Shell V2 - Java App Testing (CVE-2017-5638)
+name: Bob Shell V2 - Java App Testing
 
 on:
   issues:
