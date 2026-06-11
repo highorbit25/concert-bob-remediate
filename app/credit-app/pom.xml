@@ -18,11 +18,11 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <!-- Use Java 8 for compatibility with Struts 2.3.31 -->
+        <!-- Use Java 8 for compatibility with Struts 2.5.33 -->
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
-        <!-- VULNERABLE: Apache Struts 2.3.31 -->
-        <struts2.version>2.3.31</struts2.version>
+        <!-- PATCHED: Apache Struts 2.5.33 - Fixes CVE-2017-5638, CVE-2023-50164, and 16 other CVEs -->
+        <struts2.version>2.5.33</struts2.version>
     </properties>
 
     <dependencies>
