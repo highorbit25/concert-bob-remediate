@@ -875,10 +875,11 @@ customModes:
          - Filter by application name if specified in the GitHub issue or workflow prompt
          - Call with `Authorization: ${CONCERT_API_KEY}` and `InstanceId: ${CONCERT_INSTANCE_ID}` headers
 
-      2. **GET /core/api/v1/applications/{id}/vulnerability_details**
-         - Get detailed CVE information for a specific application
+      2. **GET /sra/api/v1/vulnerability/cves/{cve_id}**
+         - Get detailed CVE information for a specific CVE
          - Identify high-priority vulnerabilities requiring immediate action
          - Confirm severity, CVSS, and affected package context
+         - Example: curl -kX GET -H "Authorization: ${CONCERT_API_KEY}" -H "InstanceId: ${CONCERT_INSTANCE_ID}" "${CONCERT_HOSTNAME}/sra/api/v1/vulnerability/cves/CVE-2017-5638"
 
       3. **GET /core/api/v1/applications/{id}/packages**
          - List all packages used by the application

@@ -436,7 +436,7 @@ flask==2.3.3  # Fixed CVE-2023-30861 per Concert recommendation
       <description>Both flows start with Concert API research</description>
       <endpoints>
         <endpoint>GET /core/api/v1/applications</endpoint>
-        <endpoint>GET /core/api/v1/applications/{id}/vulnerability_details</endpoint>
+        <endpoint>GET /sra/api/v1/vulnerability/cves/{cve_id}</endpoint>
         <endpoint>GET /core/api/v1/software_composition/recommendations</endpoint>
       </endpoints>
       <purpose>Understand CVE context and get remediation recommendations</purpose>
