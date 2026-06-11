@@ -131,7 +131,6 @@ jobs:
                a. Query Concert API first (source .env for credentials: CONCERT_API_KEY, CONCERT_HOSTNAME, CONCERT_INSTANCE_ID)
                   - GET /applications to find application ID
                   - GET /sra/api/v1/vulnerability/cves/{CVE-ID} for CVE details
-                  - Example: source .env && curl -kX GET -H "Authorization: ${CONCERT_API_KEY}" -H "InstanceId: ${CONCERT_INSTANCE_ID}" -H "Content-Type: application/json" "${CONCERT_HOSTNAME}/sra/api/v1/vulnerability/cves/CVE-2017-5638" | jq
                   - GET /software_composition/recommendations?package_name={package} for Concert recommendation
                
                b. MANDATORY: Query NVD API for official CVE validation
