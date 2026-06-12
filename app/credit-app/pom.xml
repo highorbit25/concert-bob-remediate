@@ -12,21 +12,17 @@
 
     <name>Credit App - CVE-2017-5638 Demo</name>
     <description>
-        Vulnerable credit reporting application demonstrating CVE-2017-5638 
-        (Apache Struts RCE vulnerability exploited in 2017 Equifax breach)
+        Vulnerable credit reporting application
     </description>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <!-- Use Java 8 for compatibility with Struts 2.3.31 -->
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
-        <!-- VULNERABLE: Apache Struts 2.3.31 -->
-        <struts2.version>2.3.31</struts2.version>
+        <struts2.version>2.3.32</struts2.version>
     </properties>
 
     <dependencies>
-        <!-- VULNERABLE: Apache Struts 2.3.31 (CVE-2017-5638) -->
         <dependency>
             <groupId>org.apache.struts</groupId>
             <artifactId>struts2-core</artifactId>
@@ -64,21 +60,21 @@
         </dependency>
 
         <!-- Apache Commons Compress (required by Struts file upload) -->
-        <dependency>
+        <!-- <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-compress</artifactId>
             <version>1.21</version>
-        </dependency>
+        </dependency> -->
 
         <!-- H2 Database -->
-        <dependency>
+        <!-- <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
             <version>2.1.214</version>
-        </dependency>
+        </dependency> -->
 
         <!-- Logging -->
-        <dependency>
+        <!-- <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-core</artifactId>
             <version>2.17.1</version>
@@ -88,7 +84,7 @@
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-api</artifactId>
             <version>2.17.1</version>
-        </dependency>
+        </dependency> -->
 
         <!-- Testing Dependencies -->
         <dependency>
