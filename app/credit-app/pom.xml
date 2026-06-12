@@ -7,10 +7,10 @@
 
     <groupId>com.creditapp</groupId>
     <artifactId>credit-app</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0</version>
     <packaging>war</packaging>
 
-    <name>Credit App - CVE-2017-5638 Demo</name>
+    <name>Credit App</name>
     <description>
         Vulnerable credit reporting application
     </description>
@@ -19,7 +19,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
-        <struts2.version>2.3.32</struts2.version>
+        <struts2.version>6.1.1</struts2.version>
     </properties>
 
     <dependencies>
