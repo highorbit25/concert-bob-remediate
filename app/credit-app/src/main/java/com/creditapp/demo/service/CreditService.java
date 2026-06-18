@@ -1,8 +1,11 @@
 package com.creditapp.demo.service;
 
 import com.creditapp.demo.model.CreditReport;
+import com.creditapp.demo.util.CollectionUtils;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
@@ -76,6 +79,28 @@ public class CreditService {
             }
         }
         return null;
+    }
+    
+    /**
+     * Get all credit reports
+     */
+    public List<CreditReport> getAllCreditReports() {
+        List<CreditReport> reports = new ArrayList<>(mockReports.values());
+        
+        if (CollectionUtils.isEmpty(reports)) {
+            return new ArrayList<>();
+        }
+        
+        return reports;
+    }
+    
+    /**
+     * Get count of credit reports
+     */
+    public int getCreditReportCount() {
+        List<CreditReport> reports = new ArrayList<>(mockReports.values());
+    
+        return CollectionUtils.size(reports);
     }
 }
 
