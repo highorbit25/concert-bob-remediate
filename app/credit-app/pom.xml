@@ -67,11 +67,11 @@
         </dependency>
 
         <!-- Apache Commons Compress (required by Struts file upload) -->
-        <!-- <dependency>
+        <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-compress</artifactId>
             <version>1.21</version>
-        </dependency> -->
+        </dependency>
 
         <!-- H2 Database -->
         <!-- <dependency>
