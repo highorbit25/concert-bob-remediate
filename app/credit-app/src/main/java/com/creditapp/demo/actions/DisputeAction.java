@@ -1,7 +1,7 @@
 package com.creditapp.demo.actions;
 
 import com.creditapp.demo.model.Dispute;
-import org.apache.struts2.ActionSupport;
+import com.opensymphony.xwork2.ActionSupport;
 
 import java.util.ArrayList;
 import java.util.List;
