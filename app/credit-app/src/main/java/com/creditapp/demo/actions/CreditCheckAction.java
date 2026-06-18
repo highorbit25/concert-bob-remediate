@@ -2,7 +2,7 @@ package com.creditapp.demo.actions;
 
 import com.creditapp.demo.model.CreditReport;
 import com.creditapp.demo.service.CreditService;
-import com.opensymphony.xwork2.ActionSupport;
+import org.apache.struts2.ActionSupport;
 
 /**
  * Credit Check Action - Handles credit report requests
