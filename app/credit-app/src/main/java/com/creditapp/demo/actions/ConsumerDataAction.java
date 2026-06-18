@@ -2,7 +2,7 @@ package com.creditapp.demo.actions;
 
 import com.creditapp.demo.model.Consumer;
 import com.creditapp.demo.service.ConsumerService;
-import org.apache.struts2.ActionSupport;
+import com.opensymphony.xwork2.ActionSupport;
 
 /**
  * Consumer Data Action - Handles consumer information retrieval and updates

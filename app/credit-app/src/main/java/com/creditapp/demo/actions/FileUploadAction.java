@@ -1,7 +1,7 @@
 package com.creditapp.demo.actions;
 
-import org.apache.struts2.ActionSupport;
-import org.apache.struts2.ActionContext;
+import com.opensymphony.xwork2.ActionSupport;
+import org.apache.struts2.ServletActionContext;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -70,7 +70,7 @@ public class FileUploadAction extends ActionSupport {
             }
             
             // Create upload directory if it doesn't exist
-            String uploadPath = ActionContext.getContext().getServletContext()
+            String uploadPath = ServletActionContext.getServletContext()
                 .getRealPath("/") + "uploads/";
             File uploadDir = new File(uploadPath);
             if (!uploadDir.exists()) {
