@@ -1,0 +1,7 @@
+{
+  "security": {
+    "ibmTelemetry": {
+      "enabled": false
+    }
+  }
+}
