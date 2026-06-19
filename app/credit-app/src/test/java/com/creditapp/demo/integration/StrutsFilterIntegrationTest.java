@@ -35,6 +35,7 @@ public class StrutsFilterIntegrationTest {
             FilterConfig mockConfig = mock(FilterConfig.class);
             ServletContext mockContext = mock(ServletContext.class);
             when(mockConfig.getServletContext()).thenReturn(mockContext);
+            when(mockConfig.getInitParameterNames()).thenReturn(java.util.Collections.emptyEnumeration());
             
             // Test that init doesn't throw exceptions
             filter.init(mockConfig);
@@ -43,9 +44,7 @@ public class StrutsFilterIntegrationTest {
             
         } catch (ClassNotFoundException e) {
             fail("Struts filter class not found: " + filterClassName + 
-                 "\nThis usually means the filter class path changed in the Struts version upgrade." +
-                 "\nFor Struts 2.5+, use: org.apache.struts2.dispatcher.filter.StrutsPrepareAndExecuteFilter" +
-                 "\nFor Struts 2.3.x, use: org.apache.struts2.dispatcher.ng.filter.StrutsPrepareAndExecuteFilter");
+                 "\nThis usually means the filter class path changed in the Struts version upgrade.");
         } catch (Exception e) {
             fail("Failed to instantiate or initialize Struts filter: " + e.getMessage());
         }
