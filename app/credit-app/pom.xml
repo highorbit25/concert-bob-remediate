@@ -66,6 +66,13 @@
             <version>3.2.1</version>
         </dependency>
 
+        <!-- Apache Commons FileUpload - Explicit dependency to fix CVE-2016-1000031, CVE-2023-24998, CVE-2025-48976 -->
+        <dependency>
+            <groupId>commons-fileupload</groupId>
+            <artifactId>commons-fileupload</artifactId>
+            <version>1.5</version>
+        </dependency>
+
         <!-- Logging -->
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
