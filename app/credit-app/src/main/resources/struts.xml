@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE struts PUBLIC
+    "-//Apache Software Foundation//DTD Struts Configuration 2.3//EN"
+    "http://struts.apache.org/dtds/struts-2.3.dtd">
+
+<struts>
+    <!-- Development mode for easier debugging -->
+    <constant name="struts.devMode" value="true" />
+    
+    <!-- Enable dynamic method invocation -->
+    <constant name="struts.enable.DynamicMethodInvocation" value="true" />
+    
+    <!-- Maximum file upload size (10MB) -->
+    <constant name="struts.multipart.maxSize" value="10485760" />
+    
+    <!-- Custom error pages -->
+    <constant name="struts.custom.i18n.resources" value="messages" />
+    
+    <!-- Credit App Package -->
+    <package name="credit-app" extends="struts-default" namespace="/">
+        
+        <!-- Home/Index Action -->
+        <action name="index">
+            <result>/index.jsp</result>
+        </action>
+        
+        <!-- Credit Check Action -->
+        <action name="check-credit" class="com.creditapp.demo.actions.CreditCheckAction">
+            <result name="success">/credit-report.jsp</result>
+            <result name="input">/credit-check.jsp</result>
+            <result name="error">/error.jsp</result>
+        </action>
+        
+        <!-- Consumer Data Action -->
+        <action name="consumer-data" class="com.creditapp.demo.actions.ConsumerDataAction">
+            <result name="success">/consumer-details.jsp</result>
+            <result name="input">/consumer-data.jsp</result>
+            <result name="error">/error.jsp</result>
+        </action>
+        
+        <!-- Dispute Actions -->
+        <action name="dispute" class="com.creditapp.demo.actions.DisputeAction" method="create">
+            <result name="success">/dispute-confirmation.jsp</result>
+            <result name="input">/dispute.jsp</result>
+            <result name="error">/error.jsp</result>
+        </action>
+        
+        <!-- VULNERABLE: File Upload Action (CVE-2017-5638) -->
+        <action name="upload" class="com.creditapp.demo.actions.FileUploadAction">
+            <!-- File upload interceptor (VULNERABLE in Struts 2.3.31) -->
+            <interceptor-ref name="fileUpload">
+                <param name="maximumSize">10485760</param>
+                <param name="allowedTypes">
+                    application/pdf,
+                    image/jpeg,
+                    image/png,
+                    application/msword,
+                    application/vnd.openxmlformats-officedocument.wordprocessingml.document
+                </param>
+            </interceptor-ref>
+            <interceptor-ref name="defaultStack"/>
+            
+            <result name="success">/upload-success.jsp</result>
+            <result name="input">/file-upload.jsp</result>
+            <result name="error">/error.jsp</result>
+        </action>
+        
+    </package>
+    
+</struts>
+
+<!-- Made with Bob -->

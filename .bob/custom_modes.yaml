@@ -416,8 +416,8 @@ customModes:
          - Filter by application name if specified in the GitHub issue or workflow prompt
          - Call with `Authorization: ${CONCERT_API_KEY}` and `InstanceId: ${CONCERT_INSTANCE_ID}` headers
 
-      2. **GET /core/api/v1/applications/{id}/vulnerability_details**
-         - Get detailed CVE information for a specific application
+      2. **GET /sra/api/v1/vulnerability/cves/{cve_id}**
+         - Get detailed CVE information for a specific CVE
          - Identify high-priority vulnerabilities requiring immediate action
          - Confirm severity, CVSS, and affected package context
 
@@ -875,8 +875,8 @@ customModes:
          - Filter by application name if specified in the GitHub issue or workflow prompt
          - Call with `Authorization: ${CONCERT_API_KEY}` and `InstanceId: ${CONCERT_INSTANCE_ID}` headers
 
-      2. **GET /core/api/v1/applications/{id}/vulnerability_details**
-         - Get detailed CVE information for a specific application
+      2. **GET /sra/api/v1/vulnerability/cves/{cve_id}**
+         - Get detailed CVE information for a specific CVE
          - Identify high-priority vulnerabilities requiring immediate action
          - Confirm severity, CVSS, and affected package context
 
@@ -927,7 +927,7 @@ customModes:
 
       **Step 2: Research CVE in Concert and External Sources**
       - Query Concert API using headers derived from [`.env`](.env)
-      - Fetch [`vulnerability_details`](.bob/custom_modes.yaml:153) to understand severity and impact
+      - Use GET /sra/api/v1/vulnerability/cves/{CVE-ID} to get CVE details directly
       - Get package recommendations for affected packages
       - Cross-check Concert findings with NVD API for CVE details
       - Identify specific vulnerable functions/methods from CVE description
@@ -1170,7 +1170,7 @@ customModes:
       Required workflow:
       1. Read the triggering GitHub issue using GitHub MCP first.
       2. Extract the CVE ID, package name, application context, severity hints, and issue number.
-      3. Research the CVE in Concert and cross-check with NVD API.
+      3. Research the CVE in Concert using GET /sra/api/v1/vulnerability/cves/{CVE-ID} and cross-check with NVD API.
       4. **Perform false positive detection by analyzing source code.**
       5. **If false positive: Comment on issue with detailed analysis, tag engineer, exit.**
       6. **If true positive: Create remediation branch, update manifests, commit, push, create PR.**
