@@ -73,6 +73,13 @@
             <version>1.21</version>
         </dependency>
 
+        <!-- Apache Commons FileUpload - Explicit version to fix CVE-2023-24998 and CVE-2025-48976 -->
+        <dependency>
+            <groupId>commons-fileupload</groupId>
+            <artifactId>commons-fileupload</artifactId>
+            <version>1.6</version>
+        </dependency>
+
         <!-- H2 Database -->
         <!-- <dependency>
             <groupId>com.h2database</groupId>
