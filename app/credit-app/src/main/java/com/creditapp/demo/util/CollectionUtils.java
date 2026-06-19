@@ -1,5 +1,6 @@
 package com.creditapp.demo.util;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.Predicate;
 
 import java.util.Collection;
