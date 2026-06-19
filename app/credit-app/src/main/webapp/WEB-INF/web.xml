@@ -13,9 +13,10 @@
     </description>
     
     <!-- Struts 2 Filter -->
+    <!-- Updated for Struts 6.x - filter class path changed from .ng.filter to .filter -->
     <filter>
         <filter-name>struts2</filter-name>
-        <filter-class>org.apache.struts2.dispatcher.ng.filter.StrutsPrepareAndExecuteFilter</filter-class>
+        <filter-class>org.apache.struts2.dispatcher.filter.StrutsPrepareAndExecuteFilter</filter-class>
     </filter>
     
     <filter-mapping>
