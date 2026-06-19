@@ -16,8 +16,8 @@ public class StrutsFilterIntegrationTest {
 
     @Test
     public void testStrutsFilterClassExists() throws Exception {
-        // This is the filter class configured in web.xml for Struts 6.x
-        String filterClassName = "org.apache.struts2.dispatcher.filter.StrutsPrepareAndExecuteFilter";
+        // This is the filter class configured in web.xml
+        String filterClassName = "org.apache.struts2.dispatcher.ng.filter.StrutsPrepareAndExecuteFilter";
         
         try {
             // Attempt to load the filter class - this will fail if the class doesn't exist
@@ -35,7 +35,6 @@ public class StrutsFilterIntegrationTest {
             FilterConfig mockConfig = mock(FilterConfig.class);
             ServletContext mockContext = mock(ServletContext.class);
             when(mockConfig.getServletContext()).thenReturn(mockContext);
-            when(mockConfig.getInitParameterNames()).thenReturn(java.util.Collections.emptyEnumeration());
             
             // Test that init doesn't throw exceptions
             filter.init(mockConfig);
