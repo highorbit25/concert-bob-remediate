@@ -1,10 +1,8 @@
-name: Bob Shell V2 - Java App Testing
+name: Bob Shell V2 - Java App
 
 on:
   issues:
     types: [labeled]
-  pull_request:
-    types: [closed]
   workflow_dispatch:
     inputs:
       issue_number:
