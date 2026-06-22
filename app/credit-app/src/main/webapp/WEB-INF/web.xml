@@ -12,10 +12,10 @@
         (Apache Struts RCE vulnerability exploited in 2017 Equifax breach)
     </description>
     
-    <!-- Struts 2.5+ moved the filter out of the legacy dispatcher.ng package -->
+    <!-- Struts 2 Filter -->
     <filter>
         <filter-name>struts2</filter-name>
-        <filter-class>org.apache.struts2.dispatcher.filter.StrutsPrepareAndExecuteFilter</filter-class>
+        <filter-class>org.apache.struts2.dispatcher.ng.filter.StrutsPrepareAndExecuteFilter</filter-class>
     </filter>
     
     <filter-mapping>
