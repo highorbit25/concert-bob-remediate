@@ -66,6 +66,14 @@
             <version>3.2.1</version>
         </dependency>
 
+        <!-- Apache Commons FileUpload - Explicit override for CVE-2025-48976 and CVE-2023-24998 -->
+        <!-- Transitive dependency from struts2-core, upgraded from 1.4 to 1.6.0 -->
+        <dependency>
+            <groupId>commons-fileupload</groupId>
+            <artifactId>commons-fileupload</artifactId>
+            <version>1.6.0</version>
+        </dependency>
+
         <!-- Apache Commons Compress - Required by Struts 2.5+ -->
         <dependency>
             <groupId>org.apache.commons</groupId>
