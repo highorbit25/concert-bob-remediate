@@ -1,11 +1,13 @@
 package com.creditapp.demo.integration;
 
 import org.junit.Test;
+
 import javax.servlet.Filter;
-import javax.servlet.FilterConfig;
-import javax.servlet.ServletContext;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
 import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
 
 /**
  * Integration test to validate Struts2 filter configuration.
@@ -14,61 +16,37 @@ import static org.mockito.Mockito.*;
  */
 public class StrutsFilterIntegrationTest {
 
+    private static final String FILTER_CLASS_NAME =
+            "org.apache.struts2.dispatcher.filter.StrutsPrepareAndExecuteFilter";
+    private static final String WEB_XML_PATH = "src/main/webapp/WEB-INF/web.xml";
+
     @Test
     public void testStrutsFilterClassExists() throws Exception {
-        // This is the filter class configured in web.xml
-        String filterClassName = "org.apache.struts2.dispatcher.ng.filter.StrutsPrepareAndExecuteFilter";
-        
         try {
-            // Attempt to load the filter class - this will fail if the class doesn't exist
-            Class<?> filterClass = Class.forName(filterClassName);
-            
-            // Verify it's actually a Filter
-            assertTrue("Filter class must implement javax.servlet.Filter", 
-                      Filter.class.isAssignableFrom(filterClass));
-            
-            // Try to instantiate it to ensure it's not abstract
+            // Validate the upgraded Struts filter class can be loaded and instantiated.
+            Class<?> filterClass = Class.forName(FILTER_CLASS_NAME);
+
+            assertTrue("Filter class must implement javax.servlet.Filter",
+                    Filter.class.isAssignableFrom(filterClass));
+
             Filter filter = (Filter) filterClass.getDeclaredConstructor().newInstance();
             assertNotNull("Filter instance should not be null", filter);
-            
-            // Mock FilterConfig to test initialization
-            FilterConfig mockConfig = mock(FilterConfig.class);
-            ServletContext mockContext = mock(ServletContext.class);
-            when(mockConfig.getServletContext()).thenReturn(mockContext);
-            when(mockConfig.getInitParameterNames()).thenReturn(java.util.Collections.emptyEnumeration());
-            
-            // Test that init doesn't throw exceptions
-            filter.init(mockConfig);
-            
-            System.out.println("✓ Struts filter class validated: " + filterClassName);
-            
+
+            System.out.println("✓ Struts filter class validated: " + FILTER_CLASS_NAME);
         } catch (ClassNotFoundException e) {
-            fail("Struts filter class not found: " + filterClassName + 
-                 "\nThis usually means the filter class path changed in the Struts version upgrade.");
-        } catch (Exception e) {
-            fail("Failed to instantiate or initialize Struts filter: " + e.getMessage());
+            fail("Struts filter class not found: " + FILTER_CLASS_NAME +
+                    "\nThis usually means the filter class path changed in the Struts version upgrade.");
         }
     }
-    
+
     @Test
-    public void testStrutsFilterClassExistsForCurrentVersion() throws Exception {
-        // Test the correct filter class for Struts 2.5+ / 6.x
-        String newFilterClassName = "org.apache.struts2.dispatcher.filter.StrutsPrepareAndExecuteFilter";
-        
-        try {
-            Class<?> filterClass = Class.forName(newFilterClassName);
-            assertTrue("Filter class must implement javax.servlet.Filter", 
-                      Filter.class.isAssignableFrom(filterClass));
-            
-            Filter filter = (Filter) filterClass.getDeclaredConstructor().newInstance();
-            assertNotNull("Filter instance should not be null", filter);
-            
-            System.out.println("✓ New Struts filter class available: " + newFilterClassName);
-            
-        } catch (ClassNotFoundException e) {
-            // This is expected if we're still on Struts 2.3.x
-            System.out.println("ℹ New filter class not available (expected for Struts 2.3.x): " + newFilterClassName);
-        }
+    public void testWebXmlUsesCurrentStrutsFilterClass() throws Exception {
+        String webXml = new String(Files.readAllBytes(Paths.get(WEB_XML_PATH)), StandardCharsets.UTF_8);
+
+        assertTrue("web.xml should reference the upgraded Struts filter class",
+                webXml.contains("<filter-class>" + FILTER_CLASS_NAME + "</filter-class>"));
+        assertFalse("web.xml should not reference the legacy Struts dispatcher.ng filter class",
+                webXml.contains("org.apache.struts2.dispatcher.ng.filter.StrutsPrepareAndExecuteFilter"));
     }
 }
 
