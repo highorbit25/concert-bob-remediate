@@ -19,7 +19,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
-        <struts2.version>2.5.22</struts2.version>
+        <!-- Upgraded from 2.5.22 to 6.4.0 to fix CVE-2020-17530, CVE-2021-31805, CVE-2023-34149, CVE-2023-34396, CVE-2023-41835, CVE-2023-50164, CVE-2024-53677, CVE-2025-64775, CVE-2025-66675, CVE-2025-68493 -->
+        <struts2.version>6.4.0</struts2.version>
     </properties>
 
     <dependencies>
