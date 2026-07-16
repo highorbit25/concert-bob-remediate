@@ -17,8 +17,7 @@ public class StrutsFilterIntegrationTest {
     @Test
     public void testStrutsFilterClassExists() throws Exception {
         // This is the filter class configured in web.xml
-        // Updated for Struts 2.5+ - filter package changed from .ng.filter to .filter
-        String filterClassName = "org.apache.struts2.dispatcher.filter.StrutsPrepareAndExecuteFilter";
+        String filterClassName = "org.apache.struts2.dispatcher.ng.filter.StrutsPrepareAndExecuteFilter";
         
         try {
             // Attempt to load the filter class - this will fail if the class doesn't exist
