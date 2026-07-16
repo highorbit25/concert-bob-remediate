@@ -14,8 +14,6 @@ A vulnerable credit reporting application built with Apache Struts 2.3.31, demon
 - **Impact**: Remote Code Execution (RCE)
 - **Real-World Impact**: 2017 Equifax breach (147M records)
 - **Documentation**: See [app/credit-app/README.md](app/credit-app/README.md)
-- **Exploit Guide**: See [app/credit-app/EXPLOIT_GUIDE.md](app/credit-app/EXPLOIT_GUIDE.md)
-- **Migration Guide**: See [docs/MIGRATION_GUIDE.md](docs/MIGRATION_GUIDE.md)
 
 ---
 
@@ -134,10 +132,20 @@ SWE_REVIEWERS=['swe-user']
 1. Create `devops-approval` environment
 2. Add `Deployment protection rules` > `Required reviewers` > Select `devops-user`
 
+#### Reset scenario
+To simulate clearing of vulnerabilities for the credit-app, use `pom-reset.xml`
+```
+cp pom-reset.xml pom.xml
+```
+
+To re-introduce vulnerabilities for the credit-app, use `pom-vuln.xml`
+```
+cp pom-vuln.xml pom.xml
+```
 
 
 ### Bob shell
-For development purposes, Bob shell is currently installed on the Github Actions runner when the Github Action is triggered, followed by the configuration of Github MCP server. The custom 'devops-concert-shell' mode is also configured in the `.bob` directory in the repository. 
+For development purposes, Bob shell is currently installed on the Github Actions runner when the Github Action is triggered, followed by the configuration of Github MCP server. The custom 'devops-concert-shell-v2' mode is also configured in the `.bob` directory in the repository. 
 
 For an actual production setup, a dedicated Github runner with Bob shell installed and settings pre-configured can be used.
 
